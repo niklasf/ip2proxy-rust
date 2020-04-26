@@ -1,3 +1,11 @@
+// TODO:
+// - Test v4
+// - Test v6
+// - Clippy
+// - Documentation
+// - Test 6to4
+// - Test teredo
+
 #![forbid(unsafe_code)]
 
 use std::path::Path;
@@ -104,6 +112,8 @@ impl Database {
     }
 
     pub fn query(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
+        let addr = normalize_ip(addr);
+
         if let Some(RowRange { mut low_row, mut high_row }) = self.query_index(addr) {
             let (base_ptr, addr_size) = match addr.is_ipv4() {
                 true => (self.header.base_ptr_v4, 4),
@@ -223,6 +233,26 @@ impl Database {
     }
 }
 
+const FROM_6TO4: u128   = 0x2002_0000_0000_0000_0000_0000_0000_0000;
+const TO_6TO4: u128     = 0x2002_ffff_ffff_ffff_ffff_ffff_ffff_ffff;
+const FROM_TEREDO: u128 = 0x2001_0000_0000_0000_0000_0000_0000_0000;
+const TO_TEREDO: u128   = 0x2001_0000_ffff_ffff_ffff_ffff_ffff_ffff;
+
+fn normalize_ip(addr: IpAddr) -> IpAddr {
+    match addr {
+        IpAddr::V4(_) => addr,
+        IpAddr::V6(addr) => {
+            if Ipv6Addr::from(FROM_6TO4) <= addr && addr <= Ipv6Addr::from(TO_6TO4) {
+                IpAddr::V4(((u128::from(addr) >> 80) as u32).into())
+            } else if Ipv6Addr::from(FROM_TEREDO) <= addr && addr <= Ipv6Addr::from(TO_TEREDO) {
+                IpAddr::V4((!u128::from(addr) as u32).into())
+            } else {
+                IpAddr::V6(addr)
+            }
+        },
+    }
+}
+
 fn mid(low_row: u32, high_row: u32) -> u32 {
     ((u64::from(low_row) + u64::from(high_row)) / 2) as u32
 }
@@ -313,4 +343,3 @@ impl Index {
         Ok(Index { table })
     }
 }
-
