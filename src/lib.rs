@@ -3,11 +3,12 @@
 use std::path::Path;
 use std::io;
 use std::io::Read;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::cmp::min;
 
 use bitflags::bitflags;
 use bstr::BString;
-use byteorder::{LE, ReadBytesExt as _ };
+use byteorder::{LE, ReadBytesExt as _, ByteOrder as _};
 use positioned_io::{Cursor, RandomAccessFile, ReadBytesAtExt as _, ReadAt as _};
 
 bitflags! {
@@ -62,11 +63,10 @@ const PX: [Columns; 9] = [
     Columns::PX8,
 ];
 
-#[derive(Debug)]
 pub struct Database {
     raf: RandomAccessFile,
     pub info: DatabaseInfo,
-    index: Vec<OffsetRange>,
+    index: Index,
     columns: Columns,
 }
 
@@ -78,22 +78,50 @@ pub struct DatabaseInfo {
     month: u8,
     day: u8,
     rows: u32,
-    base_addr: u32,
+    base_ptr: u32,
     rows_ipv6: u32,
-    base_addr_ipv6: u32,
-    index_base_addr: u32,
-    index_base_addr_ipv6: u32,
+    base_ptr_ipv6: u32,
+    index_base_ptr: u32,
+    index_base_ptr_ipv6: u32,
 }
 
 #[derive(Debug, Copy, Clone)]
-struct OffsetRange {
-    low: u32,
-    high: u32,
+struct RowRange {
+    low_row: u32,
+    high_row: u32,
 }
 
-const INDEX_SIZE: usize = 65536;
+const INDEX_SIZE: usize = 1 << 16;
 
-const PROXYTYPE_POS: [u64; 9] = [0, 0, 2, 2, 2, 2, 2, 2, 2];
+const MAX_COLUMNS: usize = 11;
+
+struct Index {
+    table: Vec<RowRange>,
+}
+
+impl Index {
+    fn read<R: Read>(mut reader: R) -> io::Result<Index> {
+        let mut table = Vec::with_capacity(INDEX_SIZE);
+        while table.len() < INDEX_SIZE {
+            table.push(RowRange {
+                low_row: reader.read_u32::<LE>()?,
+                high_row: reader.read_u32::<LE>()?,
+            })
+        }
+        Ok(Index { table })
+    }
+
+    fn get(&self, addr: IpAddr) -> RowRange {
+        self.table[match addr {
+            IpAddr::V4(addr) => (u32::from(addr) >> 16) as usize,
+            IpAddr::V6(addr) => usize::from(addr.segments()[0]),
+        }]
+    }
+}
+
+fn mid(low_row: u32, high_row: u32) -> u32 {
+    ((u64::from(low_row) + u64::from(high_row)) / 2) as u32
+}
 
 impl Database {
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Database> {
@@ -108,71 +136,74 @@ impl Database {
                 month: cursor.read_u8()?,
                 day: cursor.read_u8()?,
                 rows: cursor.read_u32::<LE>()?,
-                base_addr: cursor.read_u32::<LE>()?,
+                base_ptr: cursor.read_u32::<LE>()?,
                 rows_ipv6: cursor.read_u32::<LE>()?,
-                base_addr_ipv6: cursor.read_u32::<LE>()?,
-                index_base_addr: cursor.read_u32::<LE>()?,
-                index_base_addr_ipv6: cursor.read_u32::<LE>()?,
+                base_ptr_ipv6: cursor.read_u32::<LE>()?,
+                index_base_ptr: cursor.read_u32::<LE>()?,
+                index_base_ptr_ipv6: cursor.read_u32::<LE>()?,
             }
         };
 
-        let index = {
-            let mut cursor = Cursor::new_pos(&raf, u64::from(info.index_base_addr) - 1);
-            let mut index = Vec::with_capacity(INDEX_SIZE);
-            while index.len() < INDEX_SIZE {
-                index.push(OffsetRange {
-                    low: cursor.read_u32::<LE>()?,
-                    high: cursor.read_u32::<LE>()?,
-                });
-            }
-            index
-        };
+        // TODO: columns at least 1, at most 11 or 12
 
         Ok(Database {
             columns: PX[usize::from(info.px)], // TODO: check
+            index: Index::read(Cursor::new_pos(&raf, u64::from(info.index_base_ptr) - 1))?,
             raf,
             info,
-            index,
         })
     }
 
-    pub fn query_ipv4(&self, addr: Ipv4Addr) -> io::Result<Option<Row>> {
-        let base_addr = self.info.base_addr;
-        let column_size = u32::from(self.info.columns) << 2;
-        let ipnum = u32::from(addr);
-        let indexaddr = ipnum >> 16;
-        let OffsetRange { mut low, mut high } = self.index[indexaddr as usize];
+    pub fn query_ipv4(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
+        let RowRange { mut low_row, mut high_row } = self.index.get(addr.into());
 
-        // TODO: check with max ip range?
+        let (base_ptr, row_size, addr_size) = if addr.is_ipv4() {
+            (self.info.base_ptr, usize::from(self.info.columns) * 4, 4)
+        } else {
+            (self.info.base_ptr_ipv6, 16 + (usize::from(self.info.columns) - 1) * 4, 16)
+        };
 
-        while low <= high {
-            dbg!(ipnum, low, high);
-            let mid = (low + high) / 2; // TODO: overflow
-            let rowoffset = self.info.base_addr + mid * column_size;
-            let rowoffset2 = rowoffset + column_size;
+        let addr = match addr {
+            IpAddr::V4(addr) => IpAddr::V4(min(addr, Ipv4Addr::from(u32::MAX - 1))),
+            IpAddr::V6(addr) => IpAddr::V6(min(addr, Ipv6Addr::from(u128::MAX - 1))),
+        };
 
-            let ipfrom = self.raf.read_u32_at::<LE>(u64::from(rowoffset) - 1)?;
-            let ipto = self.raf.read_u32_at::<LE>(u64::from(rowoffset2) - 1)?;
+        let mut buffer = [0; 16 + 16 + (MAX_COLUMNS - 1) * 4];
 
-            if ipfrom <= ipnum && ipnum < ipto {
-                let firstcol = 4; // ipv4
-                return Ok(Some(self.read_row(rowoffset + firstcol - 1, column_size - firstcol, Columns::all())?)); // TODO: overflow
+        while low_row <= high_row {
+            let mid_row = mid(low_row, high_row);
+
+            // TODO: overflow
+            let row_ptr = base_ptr + mid_row * row_size as u32;
+            let next_row_ptr = base_ptr + row_size as u32;
+
+            let buf = &mut buffer[..(row_size + addr_size) as usize];
+            self.raf.read_exact_at(u64::from(row_ptr), buf)?;
+
+            let below = match addr {
+                IpAddr::V4(addr) => addr < Ipv4Addr::from(LE::read_u32(buf)),
+                IpAddr::V6(addr) => addr < Ipv6Addr::from(LE::read_u128(buf)),
+            };
+
+            let above = match addr {
+                IpAddr::V4(addr) => addr >= Ipv4Addr::from(LE::read_u32(&buf[row_size..])),
+                IpAddr::V6(addr) => addr >= Ipv6Addr::from(LE::read_u128(&buf[row_size..])),
+            };
+
+            if below {
+                high_row = mid_row - 1; // overflow
+            } else if above {
+                low_row = mid_row + 1; // overflow
             } else {
-                if ipnum < ipfrom {
-                    high = mid - 1; // overflow
-                } else {
-                    low = mid + 1; // overflow
-                }
+                return Ok(Some(self.read_row(&buf[addr_size..row_size], query)?));
             }
         }
 
         Ok(None)
     }
 
-    fn read_row(&self, ptr: u32, len: u32, query: Columns) -> io::Result<Row> {
-        let mut buffer = vec![0; len as usize]; // TODO: allocation size
-        self.raf.read_exact_at(u64::from(ptr), &mut buffer)?;
-        let mut cursor = io::Cursor::new(buffer);
+    fn read_row(&self, buf: &[u8], query: Columns) -> io::Result<Row> {
+        let mut cursor = io::Cursor::new(buf);
 
         let proxy_type = self.read_col(&mut cursor, query, Columns::PROXY_TYPE)?;
         let (country_short, country_long) = self.read_country_col(&mut cursor, query)?;
