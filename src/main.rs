@@ -1,11 +1,11 @@
 use std::path::Path;
 use std::io;
 use std::net::Ipv4Addr;
-use positioned_io::{Cursor, Slice, RandomAccessFile, ReadBytesAtExt as _, ReadAt as _};
-use byteorder::LE;
-use byteorder::ReadBytesExt;
-use bstr::BString;
+
 use bitflags::bitflags;
+use bstr::BString;
+use byteorder::{LE, ReadBytesExt as _ };
+use positioned_io::{Cursor, Slice, RandomAccessFile, ReadBytesAtExt as _, ReadAt as _};
 
 bitflags! {
     pub struct Columns: u32 {
