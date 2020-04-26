@@ -65,24 +65,44 @@ const PX: [Columns; 9] = [
 
 pub struct Database {
     raf: RandomAccessFile,
-    pub info: DatabaseInfo,
-    index: Index,
+    header: Header,
+    index_v4: Index,
+    index_v6: Index,
     columns: Columns,
 }
 
-#[derive(Debug)]
-pub struct DatabaseInfo {
+struct Header {
     px: u8,
-    columns: u8,
+    num_columns: u8,
     year: u8,
     month: u8,
     day: u8,
-    rows: u32,
-    base_ptr: u32,
-    rows_ipv6: u32,
-    base_ptr_ipv6: u32,
-    index_base_ptr: u32,
-    index_base_ptr_ipv6: u32,
+    rows_v4: u32,
+    base_ptr_v4: u32,
+    rows_v6: u32,
+    base_ptr_v6: u32,
+    index_ptr_v4: u32,
+    index_ptr_v6: u32,
+}
+
+const HEADER_LEN: usize = 5 * 1 + 6 * 4;
+
+impl Header {
+    fn read<R: Read>(mut reader: R) -> io::Result<Header> {
+        Ok(Header {
+            px: reader.read_u8()?,
+            num_columns: reader.read_u8()?,
+            year: reader.read_u8()?,
+            month: reader.read_u8()?,
+            day: reader.read_u8()?,
+            rows_v4: reader.read_u32::<LE>()?,
+            base_ptr_v4: reader.read_u32::<LE>()?,
+            rows_v6: reader.read_u32::<LE>()?,
+            base_ptr_v6: reader.read_u32::<LE>()?,
+            index_ptr_v4: reader.read_u32::<LE>()?,
+            index_ptr_v6: reader.read_u32::<LE>()?,
+        })
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -90,8 +110,6 @@ struct RowRange {
     low_row: u32,
     high_row: u32,
 }
-
-const INDEX_SIZE: usize = 1 << 16;
 
 const MAX_COLUMNS: usize = 11;
 
@@ -101,21 +119,14 @@ struct Index {
 
 impl Index {
     fn read<R: Read>(mut reader: R) -> io::Result<Index> {
-        let mut table = Vec::with_capacity(INDEX_SIZE);
-        while table.len() < INDEX_SIZE {
+        let mut table = Vec::with_capacity(1 << 16);
+        while table.len() < (1 << 16) {
             table.push(RowRange {
                 low_row: reader.read_u32::<LE>()?,
                 high_row: reader.read_u32::<LE>()?,
             })
         }
         Ok(Index { table })
-    }
-
-    fn get(&self, addr: IpAddr) -> RowRange {
-        self.table[match addr {
-            IpAddr::V4(addr) => (u32::from(addr) >> 16) as usize,
-            IpAddr::V6(addr) => usize::from(addr.segments()[0]),
-        }]
     }
 }
 
@@ -127,43 +138,31 @@ impl Database {
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Database> {
         let raf = RandomAccessFile::open(path)?;
 
-        let info = {
-            let mut cursor = Cursor::new_pos(&raf, 0);
-            DatabaseInfo {
-                px: cursor.read_u8()?,
-                columns: cursor.read_u8()?,
-                year: cursor.read_u8()?,
-                month: cursor.read_u8()?,
-                day: cursor.read_u8()?,
-                rows: cursor.read_u32::<LE>()?,
-                base_ptr: cursor.read_u32::<LE>()?,
-                rows_ipv6: cursor.read_u32::<LE>()?,
-                base_ptr_ipv6: cursor.read_u32::<LE>()?,
-                index_base_ptr: cursor.read_u32::<LE>()?,
-                index_base_ptr_ipv6: cursor.read_u32::<LE>()?,
-            }
-        };
+        let mut header_buf = [0; HEADER_LEN];
+        raf.read_exact_at(0, &mut header_buf);
+        let header = Header::read(&header_buf[..])?;
 
         // TODO: columns at least 1, at most 11 or 12
 
         Ok(Database {
-            columns: PX[usize::from(info.px)], // TODO: check
-            index: Index::read(Cursor::new_pos(&raf, u64::from(info.index_base_ptr) - 1))?,
+            columns: PX[usize::from(header.px)], // TODO: check
+            index_v4: Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?,
+            index_v6: Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?,
             raf,
-            info,
+            header,
         })
     }
 
     pub fn query_ipv4(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
-        let RowRange { mut low_row, mut high_row } = self.index.get(addr.into());
+        let RowRange { mut low_row, mut high_row } = self.query_index(addr);
 
         let (base_ptr, addr_size) = if addr.is_ipv4() {
-            (self.info.base_ptr, 4)
+            (self.header.base_ptr_v4, 4)
         } else {
-            (self.info.base_ptr_ipv6, 16)
+            (self.header.base_ptr_v6, 16)
         };
 
-        let row_size = addr_size + (usize::from(self.info.columns) - 1) * 4;
+        let row_size = addr_size + (usize::from(self.header.num_columns) - 1) * 4;
 
         let addr = match addr {
             IpAddr::V4(addr) => IpAddr::V4(min(addr, Ipv4Addr::from(u32::MAX - 1))),
@@ -203,6 +202,13 @@ impl Database {
         }
 
         Ok(None)
+    }
+
+    fn query_index(&self, addr: IpAddr) -> RowRange {
+        match addr {
+            IpAddr::V4(addr) => self.index_v4.table[(u32::from(addr) >> 16) as usize],
+            IpAddr::V6(addr) => self.index_v6.table[usize::from(addr.segments()[0])],
+        }
     }
 
     fn read_row(&self, buf: &[u8], query: Columns) -> io::Result<Row> {
