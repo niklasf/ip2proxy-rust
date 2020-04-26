@@ -136,7 +136,7 @@ impl Database {
         })
     }
 
-    fn query_ipv4(&self, addr: Ipv4Addr) -> io::Result<Option<Row>> {
+    pub fn query_ipv4(&self, addr: Ipv4Addr) -> io::Result<Option<Row>> {
         let base_addr = self.info.base_addr;
         let column_size = u32::from(self.info.columns) << 2;
         let ipnum = u32::from(addr);
@@ -228,10 +228,4 @@ impl Database {
         self.raf.read_exact_at(ptr + 1, &mut buf)?; // ptr <= u32::MAX + 3
         Ok(buf.into())
     }
-}
-
-fn main() {
-    let db = Database::open("IP2PROXY-IP-PROXYTYPE-COUNTRY.BIN").unwrap();
-    dbg!(&db.info);
-    dbg!(db.query_ipv4("188.225.39.168".parse().unwrap()));
 }
