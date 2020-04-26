@@ -21,7 +21,7 @@ bitflags! {
         const DOMAIN        = 1 <<  6;
         const USAGE_TYPE    = 1 <<  7;
         const ASN           = 1 <<  8;
-        const AS            = 1 <<  9;
+        const AS_NAME       = 1 <<  9;
         const LAST_SEEN     = 1 << 10;
 
         const PX1 = Columns::COUNTRY_SHORT.bits | Columns::COUNTRY_LONG.bits;
@@ -30,7 +30,7 @@ bitflags! {
         const PX4 = Columns::PX3.bits | Columns::ISP.bits;
         const PX5 = Columns::PX4.bits | Columns::DOMAIN.bits;
         const PX6 = Columns::PX5.bits | Columns::USAGE_TYPE.bits;
-        const PX7 = Columns::PX6.bits | Columns::ASN.bits | Columns::AS.bits;
+        const PX7 = Columns::PX6.bits | Columns::ASN.bits | Columns::AS_NAME.bits;
         const PX8 = Columns::PX7.bits | Columns::LAST_SEEN.bits;
     }
 }
@@ -46,7 +46,7 @@ pub struct Row {
     domain: Option<BString>,
     usage_type: Option<BString>,
     asn: Option<BString>,
-    as_: Option<BString>,
+    as_name: Option<BString>,
     last_seen: Option<BString>,
 }
 
@@ -176,7 +176,7 @@ impl Database {
 
         let mut row = Row::default();
 
-        self.read_col(&mut cursor, query, &mut row, Columns::PROXY_TYPE);
+        self.read_col(&mut cursor, query, &mut row.proxy_type, Columns::PROXY_TYPE);
 
         if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
             let offset = cursor.read_u32::<LE>()?;
@@ -188,23 +188,23 @@ impl Database {
             }
         }
 
-        self.read_col(&mut cursor, query, &mut row, Columns::REGION);
-        self.read_col(&mut cursor, query, &mut row, Columns::CITY);
-        self.read_col(&mut cursor, query, &mut row, Columns::ISP);
-        self.read_col(&mut cursor, query, &mut row, Columns::DOMAIN);
-        self.read_col(&mut cursor, query, &mut row, Columns::USAGE_TYPE);
-        self.read_col(&mut cursor, query, &mut row, Columns::ASN);
-        self.read_col(&mut cursor, query, &mut row, Columns::AS);
-        self.read_col(&mut cursor, query, &mut row, Columns::LAST_SEEN);
+        self.read_col(&mut cursor, query, &mut row.region, Columns::REGION);
+        self.read_col(&mut cursor, query, &mut row.city, Columns::CITY);
+        self.read_col(&mut cursor, query, &mut row.isp, Columns::ISP);
+        self.read_col(&mut cursor, query, &mut row.domain, Columns::DOMAIN);
+        self.read_col(&mut cursor, query, &mut row.usage_type, Columns::USAGE_TYPE);
+        self.read_col(&mut cursor, query, &mut row.asn, Columns::ASN);
+        self.read_col(&mut cursor, query, &mut row.as_name, Columns::AS_NAME);
+        self.read_col(&mut cursor, query, &mut row.last_seen, Columns::LAST_SEEN);
 
         Ok(row)
     }
 
-    fn read_col<R: Read>(&self, mut reader: R, query: Columns, row: &mut Row, column: Columns) -> io::Result<()> {
+    fn read_col<R: Read>(&self, mut reader: R, query: Columns, row: &mut Option<BString>, column: Columns) -> io::Result<()> {
         if self.columns.contains(column) {
             let ptr = reader.read_u32::<LE>()?;
             if query.contains(column) {
-                row.proxy_type = Some(self.read_str(ptr)?);
+                *row = Some(self.read_str(ptr)?);
             }
         }
         Ok(())
