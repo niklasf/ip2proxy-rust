@@ -5,6 +5,22 @@ use positioned_io::{Cursor, Slice, RandomAccessFile, ReadBytesAtExt as _, ReadAt
 use byteorder::LE;
 use byteorder::ReadBytesExt;
 use bstr::BString;
+use bitflags::bitflags;
+
+bitflags! {
+    pub struct Columns: u32 {
+        const COUNTRY    = 1 << 0;
+        const REGION     = 1 << 1;
+        const CITY       = 1 << 2;
+        const ISP        = 1 << 3;
+        const PROXY_TYPE = 1 << 4;
+        const DOMAIN     = 1 << 5;
+        const USAGE_TYPE = 1 << 6;
+        const ASN        = 1 << 7;
+        const AS         = 1 << 8;
+        const LAST_SEEN  = 1 << 9;
+    }
+}
 
 #[derive(Debug)]
 struct Database {
