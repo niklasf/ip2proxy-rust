@@ -71,97 +71,6 @@ pub struct Database {
     columns: Columns,
 }
 
-pub struct Header {
-    px: u8,
-    num_columns: u8,
-    year: u8,
-    month: u8,
-    day: u8,
-    rows_v4: u32,
-    base_ptr_v4: u32,
-    rows_v6: u32,
-    base_ptr_v6: u32,
-    index_ptr_v4: u32,
-    index_ptr_v6: u32,
-}
-
-const HEADER_LEN: usize = 5 * 1 + 6 * 4;
-
-const MAX_COLUMNS: usize = 11;
-
-fn validate_columns(num_columns: u8) -> io::Result<u8> {
-    if num_columns < 1 || MAX_COLUMNS < usize::from(num_columns) {
-        Err(io::Error::new(io::ErrorKind::InvalidData, "invalid number of columns"))
-    } else {
-        Ok(num_columns)
-    }
-}
-
-impl Header {
-    fn read<R: Read>(mut reader: R) -> io::Result<Header> {
-        Ok(Header {
-            px: reader.read_u8()?,
-            num_columns: validate_columns(reader.read_u8()?)?,
-            year: reader.read_u8()?,
-            month: reader.read_u8()?,
-            day: reader.read_u8()?,
-            rows_v4: reader.read_u32::<LE>()?,
-            base_ptr_v4: reader.read_u32::<LE>()?,
-            rows_v6: reader.read_u32::<LE>()?,
-            base_ptr_v6: reader.read_u32::<LE>()?,
-            index_ptr_v4: reader.read_u32::<LE>()?,
-            index_ptr_v6: reader.read_u32::<LE>()?,
-        })
-    }
-
-    pub fn year(&self) -> u8 {
-        self.year
-    }
-
-    pub fn month(&self) -> u8 {
-        self.month
-    }
-
-    pub fn day(&self) -> u8 {
-        self.day
-    }
-
-    pub fn rows_ipv4(&self) -> u32 {
-        self.rows_v4
-    }
-
-    pub fn rows_ipv6(&self) -> u32 {
-        self.rows_v6
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-struct RowRange {
-    low_row: u32,
-    high_row: u32,
-}
-
-struct Index {
-    table: Vec<RowRange>,
-}
-
-impl Index {
-    fn read<R: Read>(mut reader: R) -> io::Result<Index> {
-        let mut table = Vec::with_capacity(1 << 16);
-        while table.len() < (1 << 16) {
-            table.push(RowRange {
-                low_row: reader.read_u32::<LE>()?,
-                high_row: reader.read_u32::<LE>()?,
-            })
-        }
-        Ok(Index { table })
-    }
-}
-
-fn mid(low_row: u32, high_row: u32) -> u32 {
-    ((u64::from(low_row) + u64::from(high_row)) / 2) as u32
-}
-
 impl Database {
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Database> {
         let raf = RandomAccessFile::open(path)?;
@@ -313,3 +222,95 @@ impl Database {
         Ok(buf.into())
     }
 }
+
+fn mid(low_row: u32, high_row: u32) -> u32 {
+    ((u64::from(low_row) + u64::from(high_row)) / 2) as u32
+}
+
+const HEADER_LEN: usize = 5 * 1 + 6 * 4;
+
+pub struct Header {
+    px: u8,
+    num_columns: u8,
+    year: u8,
+    month: u8,
+    day: u8,
+    rows_v4: u32,
+    base_ptr_v4: u32,
+    rows_v6: u32,
+    base_ptr_v6: u32,
+    index_ptr_v4: u32,
+    index_ptr_v6: u32,
+}
+
+const MAX_COLUMNS: usize = 11;
+
+fn validate_columns(num_columns: u8) -> io::Result<u8> {
+    if num_columns < 1 || MAX_COLUMNS < usize::from(num_columns) {
+        Err(io::Error::new(io::ErrorKind::InvalidData, "invalid number of columns"))
+    } else {
+        Ok(num_columns)
+    }
+}
+
+impl Header {
+    fn read<R: Read>(mut reader: R) -> io::Result<Header> {
+        Ok(Header {
+            px: reader.read_u8()?,
+            num_columns: validate_columns(reader.read_u8()?)?,
+            year: reader.read_u8()?,
+            month: reader.read_u8()?,
+            day: reader.read_u8()?,
+            rows_v4: reader.read_u32::<LE>()?,
+            base_ptr_v4: reader.read_u32::<LE>()?,
+            rows_v6: reader.read_u32::<LE>()?,
+            base_ptr_v6: reader.read_u32::<LE>()?,
+            index_ptr_v4: reader.read_u32::<LE>()?,
+            index_ptr_v6: reader.read_u32::<LE>()?,
+        })
+    }
+
+    pub fn year(&self) -> u8 {
+        self.year
+    }
+
+    pub fn month(&self) -> u8 {
+        self.month
+    }
+
+    pub fn day(&self) -> u8 {
+        self.day
+    }
+
+    pub fn rows_ipv4(&self) -> u32 {
+        self.rows_v4
+    }
+
+    pub fn rows_ipv6(&self) -> u32 {
+        self.rows_v6
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+struct RowRange {
+    low_row: u32,
+    high_row: u32,
+}
+
+struct Index {
+    table: Vec<RowRange>,
+}
+
+impl Index {
+    fn read<R: Read>(mut reader: R) -> io::Result<Index> {
+        let mut table = Vec::with_capacity(1 << 16);
+        while table.len() < (1 << 16) {
+            table.push(RowRange {
+                low_row: reader.read_u32::<LE>()?,
+                high_row: reader.read_u32::<LE>()?,
+            })
+        }
+        Ok(Index { table })
+    }
+}
+
