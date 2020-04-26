@@ -8,7 +8,7 @@ use std::net::Ipv4Addr;
 use bitflags::bitflags;
 use bstr::BString;
 use byteorder::{LE, ReadBytesExt as _ };
-use positioned_io::{Cursor, Slice, RandomAccessFile, ReadBytesAtExt as _, ReadAt as _};
+use positioned_io::{Cursor, RandomAccessFile, ReadBytesAtExt as _, ReadAt as _};
 
 bitflags! {
     pub struct Columns: u32 {
@@ -35,7 +35,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Row {
     proxy_type: Option<BString>,
     country_short: Option<BString>,
@@ -169,45 +169,54 @@ impl Database {
         Ok(None)
     }
 
-    fn read_row(&self, pos: u32, len: u32, query: Columns) -> io::Result<Row> {
+    fn read_row(&self, ptr: u32, len: u32, query: Columns) -> io::Result<Row> {
         let mut buffer = vec![0; len as usize]; // TODO: allocation size
-        self.raf.read_exact_at(u64::from(pos), &mut buffer)?;
+        self.raf.read_exact_at(u64::from(ptr), &mut buffer)?;
         let mut cursor = io::Cursor::new(buffer);
 
-        let mut row = Row::default();
+        let proxy_type = self.read_col(&mut cursor, query, Columns::PROXY_TYPE)?;
+        let (country_short, country_long) = self.read_country_col(&mut cursor, query)?;
 
-        self.read_col(&mut cursor, query, &mut row.proxy_type, Columns::PROXY_TYPE);
-
-        if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
-            let offset = cursor.read_u32::<LE>()?;
-            if query.contains(Columns::COUNTRY_SHORT) {
-                row.country_short = Some(self.read_str(offset)?);
-            }
-            if query.contains(Columns::COUNTRY_LONG) {
-                row.country_long = Some(self.read_str(offset + 3)?); // TODO: overflow
-            }
-        }
-
-        self.read_col(&mut cursor, query, &mut row.region, Columns::REGION);
-        self.read_col(&mut cursor, query, &mut row.city, Columns::CITY);
-        self.read_col(&mut cursor, query, &mut row.isp, Columns::ISP);
-        self.read_col(&mut cursor, query, &mut row.domain, Columns::DOMAIN);
-        self.read_col(&mut cursor, query, &mut row.usage_type, Columns::USAGE_TYPE);
-        self.read_col(&mut cursor, query, &mut row.asn, Columns::ASN);
-        self.read_col(&mut cursor, query, &mut row.as_name, Columns::AS_NAME);
-        self.read_col(&mut cursor, query, &mut row.last_seen, Columns::LAST_SEEN);
-
-        Ok(row)
+        Ok(Row {
+            proxy_type,
+            country_short,
+            country_long,
+            region: self.read_col(&mut cursor, query, Columns::REGION)?,
+            city: self.read_col(&mut cursor, query, Columns::CITY)?,
+            isp: self.read_col(&mut cursor, query, Columns::ISP)?,
+            domain: self.read_col(&mut cursor, query, Columns::DOMAIN)?,
+            usage_type: self.read_col(&mut cursor, query, Columns::USAGE_TYPE)?,
+            asn: self.read_col(&mut cursor, query, Columns::ASN)?,
+            as_name: self.read_col(&mut cursor, query, Columns::AS_NAME)?,
+            last_seen: self.read_col(&mut cursor, query, Columns::LAST_SEEN)?,
+        })
     }
 
-    fn read_col<R: Read>(&self, mut reader: R, query: Columns, row: &mut Option<BString>, column: Columns) -> io::Result<()> {
+    fn read_country_col<R: Read>(&self, mut reader: R, query: Columns) -> io::Result<(Option<BString>, Option<BString>)> {
+        if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
+            let ptr = reader.read_u32::<LE>()?;
+            let country_short = match query.contains(Columns::COUNTRY_SHORT) {
+                true => Some(self.read_str(ptr)?),
+                false => None,
+            };
+            let country_long = match query.contains(Columns::COUNTRY_LONG) {
+                true => Some(self.read_str(ptr + 3)?), // TODO: overflow
+                false => None,
+            };
+            Ok((country_short, country_long))
+        } else {
+            Ok((None, None))
+        }
+    }
+
+    fn read_col<R: Read>(&self, mut reader: R, query: Columns, column: Columns) -> io::Result<Option<BString>> {
         if self.columns.contains(column) {
             let ptr = reader.read_u32::<LE>()?;
             if query.contains(column) {
-                *row = Some(self.read_str(ptr)?);
+                return Ok(Some(self.read_str(ptr)?));
             }
         }
-        Ok(())
+        Ok(None)
     }
 
     fn read_str(&self, ptr: u32) -> io::Result<BString> {
