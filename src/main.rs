@@ -202,19 +202,22 @@ impl Database {
 
     fn read_col<R: Read>(&self, mut reader: R, query: Columns, row: &mut Row, column: Columns) -> io::Result<()> {
         if self.columns.contains(column) {
-            let offset = reader.read_u32::<LE>()?;
+            let ptr = reader.read_u32::<LE>()?;
             if query.contains(column) {
-                row.proxy_type = Some(self.read_str(offset)?);
+                row.proxy_type = Some(self.read_str(ptr)?);
             }
         }
         Ok(())
     }
 
-    fn read_str(&self, pos: u32) -> io::Result<BString> {
-        let pos = u64::from(pos);
-        let len = self.raf.read_u8_at(pos)?;
+    fn read_str(&self, ptr: u32) -> io::Result<BString> {
+        // +-----+-------+-------+-----+
+        // | len | buf 0 | buf 1 | ... |
+        // +-----+-------+-------+-----+
+        let ptr = u64::from(ptr);
+        let len = self.raf.read_u8_at(ptr)?;
         let mut buf = vec![0; usize::from(len)];
-        self.raf.read_exact_at(pos + 1, &mut buf)?;
+        self.raf.read_exact_at(ptr + 1, &mut buf)?;
         Ok(buf.into())
     }
 }
