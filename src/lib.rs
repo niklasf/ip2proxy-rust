@@ -71,7 +71,7 @@ pub struct Database {
     columns: Columns,
 }
 
-struct Header {
+pub struct Header {
     px: u8,
     num_columns: u8,
     year: u8,
@@ -113,6 +113,26 @@ impl Header {
             index_ptr_v6: reader.read_u32::<LE>()?,
         })
     }
+
+    pub fn year(&self) -> u8 {
+        self.year
+    }
+
+    pub fn month(&self) -> u8 {
+        self.month
+    }
+
+    pub fn day(&self) -> u8 {
+        self.day
+    }
+
+    pub fn rows_ipv4(&self) -> u32 {
+        self.rows_v4
+    }
+
+    pub fn rows_ipv6(&self) -> u32 {
+        self.rows_v6
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -147,7 +167,7 @@ impl Database {
         let raf = RandomAccessFile::open(path)?;
 
         let mut header_buf = [0; HEADER_LEN];
-        raf.read_exact_at(0, &mut header_buf);
+        raf.read_exact_at(0, &mut header_buf)?;
         let header = Header::read(&header_buf[..])?;
 
         let columns = PX.get(usize::from(header.px)).copied().unwrap_or(Columns::empty());
@@ -170,13 +190,20 @@ impl Database {
         })
     }
 
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+
     pub fn query(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
         if let Some(RowRange { mut low_row, mut high_row }) = self.query_index(addr) {
-            let (base_ptr, addr_size) = if addr.is_ipv4() {
-                (self.header.base_ptr_v4, 4)
-            } else {
-                (self.header.base_ptr_v6, 16)
+            let (base_ptr, addr_size) = match addr.is_ipv4() {
+                true => (self.header.base_ptr_v4, 4),
+                false => (self.header.base_ptr_v6, 16),
             };
+
+            if base_ptr == 0 {
+                return Ok(None);
+            }
 
             let row_size = addr_size + (usize::from(self.header.num_columns) - 1) * 4;
 
@@ -188,14 +215,11 @@ impl Database {
             let mut buffer = [0; 16 + 16 + (MAX_COLUMNS - 1) * 4];
 
             while low_row <= high_row {
-                dbg!(low_row, high_row);
                 let mid_row = mid(low_row, high_row);
 
-                // TODO: overflow
-                let row_ptr = base_ptr + mid_row * row_size as u32;
-
+                let row_ptr = u64::from(base_ptr) + u64::from(mid_row) * row_size as u64;
                 let buf = &mut buffer[..(row_size + addr_size) as usize];
-                self.raf.read_exact_at(u64::from(row_ptr) - 1, buf)?; // TODO
+                self.raf.read_exact_at(row_ptr - 1, buf)?;
 
                 let below = match addr {
                     IpAddr::V4(addr) => addr < Ipv4Addr::from(LE::read_u32(buf)),
@@ -208,11 +232,14 @@ impl Database {
                 };
 
                 if below {
-                    high_row = mid_row - 1; // overflow
+                    high_row = mid_row.checked_sub(1).ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::InvalidData, "underflow in binary search")
+                    })?;
                 } else if above {
-                    low_row = mid_row + 1; // overflow
+                    low_row = mid_row.checked_add(1).ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::InvalidData, "overflow in binary search")
+                    })?;
                 } else {
-                    println!("found!");
                     return Ok(Some(self.read_row(&buf[addr_size..row_size], query)?));
                 }
             }
