@@ -10,6 +10,6 @@ fn test_ipv4() -> io::Result<()> {
     //let ip = "127.0.0.1".parse().unwrap();
 
     let ip = "1.0.104.238".parse().unwrap();
-    let row = dbg!(database.query_ipv4(ip, Columns::all())?.unwrap());
+    let row = dbg!(database.query(ip, Columns::all())?.unwrap());
     Ok(())
 }

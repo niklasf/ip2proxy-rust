@@ -66,8 +66,8 @@ const PX: [Columns; 9] = [
 pub struct Database {
     raf: RandomAccessFile,
     header: Header,
-    index_v4: Index,
-    index_v6: Index,
+    index_v4: Option<Index>,
+    index_v6: Option<Index>,
     columns: Columns,
 }
 
@@ -157,68 +157,74 @@ impl Database {
 
         Ok(Database {
             columns,
-            index_v4: Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?,
-            index_v6: Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?,
+            index_v4: match header.index_ptr_v4 != 0 {
+                true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?),
+                false => None,
+            },
+            index_v6: match header.index_ptr_v6 != 0 {
+                true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?),
+                false => None,
+            },
             raf,
             header,
         })
     }
 
-    pub fn query_ipv4(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
-        let RowRange { mut low_row, mut high_row } = self.query_index(addr);
-
-        let (base_ptr, addr_size) = if addr.is_ipv4() {
-            (self.header.base_ptr_v4, 4)
-        } else {
-            (self.header.base_ptr_v6, 16)
-        };
-
-        let row_size = addr_size + (usize::from(self.header.num_columns) - 1) * 4;
-
-        let addr = match addr {
-            IpAddr::V4(addr) => IpAddr::V4(min(addr, Ipv4Addr::from(u32::MAX - 1))),
-            IpAddr::V6(addr) => IpAddr::V6(min(addr, Ipv6Addr::from(u128::MAX - 1))),
-        };
-
-        let mut buffer = [0; 16 + 16 + (MAX_COLUMNS - 1) * 4];
-
-        while low_row <= high_row {
-            dbg!(low_row, high_row);
-            let mid_row = mid(low_row, high_row);
-
-            // TODO: overflow
-            let row_ptr = base_ptr + mid_row * row_size as u32;
-
-            let buf = &mut buffer[..(row_size + addr_size) as usize];
-            self.raf.read_exact_at(u64::from(row_ptr) - 1, buf)?; // TODO
-
-            let below = match addr {
-                IpAddr::V4(addr) => addr < Ipv4Addr::from(LE::read_u32(buf)),
-                IpAddr::V6(addr) => addr < Ipv6Addr::from(LE::read_u128(buf)),
-            };
-
-            let above = match addr {
-                IpAddr::V4(addr) => addr >= Ipv4Addr::from(LE::read_u32(&buf[row_size..])),
-                IpAddr::V6(addr) => addr >= Ipv6Addr::from(LE::read_u128(&buf[row_size..])),
-            };
-
-            if below {
-                high_row = mid_row - 1; // overflow
-            } else if above {
-                low_row = mid_row + 1; // overflow
+    pub fn query(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
+        if let Some(RowRange { mut low_row, mut high_row }) = self.query_index(addr) {
+            let (base_ptr, addr_size) = if addr.is_ipv4() {
+                (self.header.base_ptr_v4, 4)
             } else {
-                println!("found!");
-                return Ok(Some(self.read_row(&buf[addr_size..row_size], query)?));
+                (self.header.base_ptr_v6, 16)
+            };
+
+            let row_size = addr_size + (usize::from(self.header.num_columns) - 1) * 4;
+
+            let addr = match addr {
+                IpAddr::V4(addr) => IpAddr::V4(min(addr, Ipv4Addr::from(u32::MAX - 1))),
+                IpAddr::V6(addr) => IpAddr::V6(min(addr, Ipv6Addr::from(u128::MAX - 1))),
+            };
+
+            let mut buffer = [0; 16 + 16 + (MAX_COLUMNS - 1) * 4];
+
+            while low_row <= high_row {
+                dbg!(low_row, high_row);
+                let mid_row = mid(low_row, high_row);
+
+                // TODO: overflow
+                let row_ptr = base_ptr + mid_row * row_size as u32;
+
+                let buf = &mut buffer[..(row_size + addr_size) as usize];
+                self.raf.read_exact_at(u64::from(row_ptr) - 1, buf)?; // TODO
+
+                let below = match addr {
+                    IpAddr::V4(addr) => addr < Ipv4Addr::from(LE::read_u32(buf)),
+                    IpAddr::V6(addr) => addr < Ipv6Addr::from(LE::read_u128(buf)),
+                };
+
+                let above = match addr {
+                    IpAddr::V4(addr) => addr >= Ipv4Addr::from(LE::read_u32(&buf[row_size..])),
+                    IpAddr::V6(addr) => addr >= Ipv6Addr::from(LE::read_u128(&buf[row_size..])),
+                };
+
+                if below {
+                    high_row = mid_row - 1; // overflow
+                } else if above {
+                    low_row = mid_row + 1; // overflow
+                } else {
+                    println!("found!");
+                    return Ok(Some(self.read_row(&buf[addr_size..row_size], query)?));
+                }
             }
         }
 
         Ok(None)
     }
 
-    fn query_index(&self, addr: IpAddr) -> RowRange {
+    fn query_index(&self, addr: IpAddr) -> Option<RowRange> {
         match addr {
-            IpAddr::V4(addr) => self.index_v4.table[(u32::from(addr) >> 16) as usize],
-            IpAddr::V6(addr) => self.index_v6.table[usize::from(addr.segments()[0])],
+            IpAddr::V4(addr) => self.index_v4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
+            IpAddr::V6(addr) => self.index_v6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
         }
     }
 
