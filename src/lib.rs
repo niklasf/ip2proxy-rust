@@ -87,11 +87,21 @@ struct Header {
 
 const HEADER_LEN: usize = 5 * 1 + 6 * 4;
 
+const MAX_COLUMNS: usize = 11;
+
+fn validate_columns(num_columns: u8) -> io::Result<u8> {
+    if num_columns < 1 || MAX_COLUMNS < usize::from(num_columns) {
+        Err(io::Error::new(io::ErrorKind::InvalidData, "invalid number of columns"))
+    } else {
+        Ok(num_columns)
+    }
+}
+
 impl Header {
     fn read<R: Read>(mut reader: R) -> io::Result<Header> {
         Ok(Header {
             px: reader.read_u8()?,
-            num_columns: reader.read_u8()?,
+            num_columns: validate_columns(reader.read_u8()?)?,
             year: reader.read_u8()?,
             month: reader.read_u8()?,
             day: reader.read_u8()?,
@@ -110,8 +120,6 @@ struct RowRange {
     low_row: u32,
     high_row: u32,
 }
-
-const MAX_COLUMNS: usize = 11;
 
 struct Index {
     table: Vec<RowRange>,
@@ -142,10 +150,13 @@ impl Database {
         raf.read_exact_at(0, &mut header_buf);
         let header = Header::read(&header_buf[..])?;
 
-        // TODO: columns at least 1, at most 11 or 12
+        let columns = PX.get(usize::from(header.px)).copied().unwrap_or(Columns::empty());
+        if columns.is_empty() {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "only px1 - px8 supported"));
+        }
 
         Ok(Database {
-            columns: PX[usize::from(header.px)], // TODO: check
+            columns,
             index_v4: Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?,
             index_v6: Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?,
             raf,
