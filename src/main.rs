@@ -61,7 +61,7 @@ const PX: [Columns; 9] = [
 ];
 
 #[derive(Debug)]
-struct Database {
+pub struct Database {
     raf: RandomAccessFile,
     pub info: DatabaseInfo,
     index: Vec<OffsetRange>,
@@ -69,7 +69,7 @@ struct Database {
 }
 
 #[derive(Debug)]
-struct DatabaseInfo {
+pub struct DatabaseInfo {
     px: u8,
     columns: u8,
     year: u8,
@@ -93,9 +93,8 @@ const INDEX_SIZE: usize = 65536;
 
 const PROXYTYPE_POS: [u64; 9] = [0, 0, 2, 2, 2, 2, 2, 2, 2];
 
-
 impl Database {
-    fn open<P: AsRef<Path>>(path: P) -> io::Result<Database> {
+    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Database> {
         let raf = RandomAccessFile::open(path)?;
 
         let info = {
@@ -154,19 +153,8 @@ impl Database {
             let ipto = self.raf.read_u32_at::<LE>(u64::from(rowoffset2) - 1)?;
 
             if ipfrom <= ipnum && ipnum < ipto {
-                println!("found!");
-
                 let firstcol = 4; // ipv4
-                let row = Slice::new(&self.raf, u64::from(rowoffset + firstcol - 1), Some(u64::from(column_size - firstcol))); // TODO: overflow
-
-                let proxytype_pos_offset = (PROXYTYPE_POS[usize::from(self.info.px)] - 2) << 2;
-
-                let offset = row.read_u32_at::<LE>(proxytype_pos_offset)?;
-                dbg!(offset);
-                dbg!(self.read_str(offset));
-
-
-                return Ok(Some(self.read_row(rowoffset + firstcol - 1, column_size - firstcol)?));
+                return Ok(Some(self.read_row(rowoffset + firstcol - 1, column_size - firstcol, Columns::all())?)); // TODO: overflow
             } else {
                 if ipnum < ipfrom {
                     high = mid - 1; // overflow
@@ -179,9 +167,16 @@ impl Database {
         Ok(None)
     }
 
-    fn read_row(&self, pos: u32, len: u32) -> io::Result<Row> {
+    fn read_row(&self, pos: u32, len: u32, query: Columns) -> io::Result<Row> {
         let slice = Slice::new(&self.raf, u64::from(pos), Some(u64::from(len)));
+        let mut cursor = Cursor::new(slice);
         let mut row = Row::default();
+
+        if self.columns.contains(Columns::PROXY_TYPE) {
+            let offset = cursor.read_u32::<LE>()?;
+            row.proxy_type = Some(self.read_str(offset)?);
+        }
+
         Ok(row)
     }
 
