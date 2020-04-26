@@ -5,6 +5,10 @@
 // - Documentation
 // - Test 6to4
 // - Test teredo
+// - Database constructors
+// - Row accessors
+// - Serde for row
+// - Reduce allocations while reading row?
 
 #![forbid(unsafe_code)]
 
