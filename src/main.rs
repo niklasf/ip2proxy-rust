@@ -194,13 +194,13 @@ impl Database {
 
     fn read_country_col<R: Read>(&self, mut reader: R, query: Columns) -> io::Result<(Option<BString>, Option<BString>)> {
         if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
-            let ptr = reader.read_u32::<LE>()?;
+            let ptr = u64::from(reader.read_u32::<LE>()?);
             let country_short = match query.contains(Columns::COUNTRY_SHORT) {
                 true => Some(self.read_str(ptr)?),
                 false => None,
             };
             let country_long = match query.contains(Columns::COUNTRY_LONG) {
-                true => Some(self.read_str(ptr + 3)?), // TODO: overflow
+                true => Some(self.read_str(ptr + 3)?), // ptr <= u32::MAX
                 false => None,
             };
             Ok((country_short, country_long))
@@ -211,7 +211,7 @@ impl Database {
 
     fn read_col<R: Read>(&self, mut reader: R, query: Columns, column: Columns) -> io::Result<Option<BString>> {
         if self.columns.contains(column) {
-            let ptr = reader.read_u32::<LE>()?;
+            let ptr = u64::from(reader.read_u32::<LE>()?);
             if query.contains(column) {
                 return Ok(Some(self.read_str(ptr)?));
             }
@@ -219,14 +219,13 @@ impl Database {
         Ok(None)
     }
 
-    fn read_str(&self, ptr: u32) -> io::Result<BString> {
+    fn read_str(&self, ptr: u64) -> io::Result<BString> {
         // +-----+-------+-------+-----+
         // | len | buf 0 | buf 1 | ... |
         // +-----+-------+-------+-----+
-        let ptr = u64::from(ptr);
         let len = self.raf.read_u8_at(ptr)?;
         let mut buf = vec![0; usize::from(len)];
-        self.raf.read_exact_at(ptr + 1, &mut buf)?;
+        self.raf.read_exact_at(ptr + 1, &mut buf)?; // ptr <= u32::MAX + 3
         Ok(buf.into())
     }
 }
