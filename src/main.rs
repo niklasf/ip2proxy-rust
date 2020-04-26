@@ -34,7 +34,7 @@ bitflags! {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct Record {
+pub struct Row {
     proxy_type: Option<BString>,
     country_short: Option<BString>,
     country_long: Option<BString>,
@@ -65,6 +65,7 @@ struct Database {
     raf: RandomAccessFile,
     pub info: DatabaseInfo,
     index: Vec<OffsetRange>,
+    columns: Columns,
 }
 
 #[derive(Debug)]
@@ -127,13 +128,14 @@ impl Database {
         };
 
         Ok(Database {
+            columns: PX[usize::from(info.px)], // TODO: check
             raf,
             info,
             index,
         })
     }
 
-    fn query_ipv4(&self, addr: Ipv4Addr) -> io::Result<()> {
+    fn query_ipv4(&self, addr: Ipv4Addr) -> io::Result<Option<Row>> {
         let base_addr = self.info.base_addr;
         let column_size = u32::from(self.info.columns) << 2;
         let ipnum = u32::from(addr);
@@ -142,7 +144,7 @@ impl Database {
 
         // TODO: check with max ip range?
 
-        while (low <= high) {
+        while low <= high {
             dbg!(ipnum, low, high);
             let mid = (low + high) / 2; // TODO: overflow
             let rowoffset = self.info.base_addr + mid * column_size;
@@ -164,7 +166,7 @@ impl Database {
                 dbg!(self.read_str(offset));
 
 
-                return Ok(());
+                return Ok(Some(self.read_row(rowoffset + firstcol - 1, column_size - firstcol)?));
             } else {
                 if ipnum < ipfrom {
                     high = mid - 1; // overflow
@@ -174,7 +176,13 @@ impl Database {
             }
         }
 
-        Ok(())
+        Ok(None)
+    }
+
+    fn read_row(&self, pos: u32, len: u32) -> io::Result<Row> {
+        let slice = Slice::new(&self.raf, u64::from(pos), Some(u64::from(len)));
+        let mut row = Row::default();
+        Ok(row)
     }
 
     fn read_str(&self, pos: u32) -> io::Result<BString> {
@@ -189,5 +197,5 @@ impl Database {
 fn main() {
     let db = Database::open("IP2PROXY-IP-PROXYTYPE-COUNTRY.BIN").unwrap();
     dbg!(&db.info);
-    db.query_ipv4("188.225.39.168".parse().unwrap());
+    dbg!(db.query_ipv4("188.225.39.168".parse().unwrap()));
 }
