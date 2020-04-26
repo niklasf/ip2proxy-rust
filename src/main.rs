@@ -1,9 +1,10 @@
 use std::path::Path;
 use std::io;
 use std::net::Ipv4Addr;
-use positioned_io::{Cursor, RandomAccessFile, ReadBytesAtExt as _};
+use positioned_io::{Cursor, Slice, RandomAccessFile, ReadBytesAtExt as _, ReadAt as _};
 use byteorder::LE;
 use byteorder::ReadBytesExt;
+use bstr::BString;
 
 #[derive(Debug)]
 struct Database {
@@ -34,6 +35,12 @@ struct OffsetRange {
 }
 
 const INDEX_SIZE: usize = 65536;
+
+const PROXYTYPE_POS: [u64; 9] = [0, 0, 2, 2, 2, 2, 2, 2, 2];
+
+struct QueryResult {
+    proxy_type: u32,
+}
 
 impl Database {
     fn open<P: AsRef<Path>>(path: P) -> io::Result<Database> {
@@ -95,6 +102,17 @@ impl Database {
 
             if ipfrom <= ipnum && ipnum < ipto {
                 println!("found!");
+
+                let firstcol = 4; // ipv4
+                let row = Slice::new(&self.raf, u64::from(rowoffset + firstcol - 1), Some(u64::from(column_size - firstcol))); // TODO: overflow
+
+                let proxytype_pos_offset = (PROXYTYPE_POS[usize::from(self.info.px)] - 2) << 2;
+
+                let offset = row.read_u32_at::<LE>(proxytype_pos_offset)?;
+                dbg!(offset);
+                dbg!(self.read_str(offset));
+
+
                 return Ok(());
             } else {
                 if ipnum < ipfrom {
@@ -106,6 +124,14 @@ impl Database {
         }
 
         Ok(())
+    }
+
+    fn read_str(&self, pos: u32) -> io::Result<BString> {
+        let pos = u64::from(pos);
+        let len = self.raf.read_u8_at(pos)?;
+        let mut buf = vec![0; usize::from(len)];
+        self.raf.read_exact_at(pos + 1, &mut buf)?;
+        Ok(buf.into())
     }
 }
 
