@@ -9,3 +9,6 @@ license = "MIT OR APACHE-2.0"
 keywords = ["ip", "proxy", "geolocation"]
 categories = ["web-programming", "parser-implementations"]
 edition = "2018"
+
+[dependencies]
+positioned-io = { package = "positioned-io-preview", version = "0.3" }
