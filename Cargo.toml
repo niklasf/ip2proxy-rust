@@ -12,3 +12,4 @@ edition = "2018"
 
 [dependencies]
 positioned-io = { package = "positioned-io-preview", version = "0.3" }
+byteorder = "1.3"
