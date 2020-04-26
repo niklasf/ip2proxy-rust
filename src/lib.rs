@@ -157,11 +157,13 @@ impl Database {
     pub fn query_ipv4(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
         let RowRange { mut low_row, mut high_row } = self.index.get(addr.into());
 
-        let (base_ptr, row_size, addr_size) = if addr.is_ipv4() {
-            (self.info.base_ptr, usize::from(self.info.columns) * 4, 4)
+        let (base_ptr, addr_size) = if addr.is_ipv4() {
+            (self.info.base_ptr, 4)
         } else {
-            (self.info.base_ptr_ipv6, 16 + (usize::from(self.info.columns) - 1) * 4, 16)
+            (self.info.base_ptr_ipv6, 16)
         };
+
+        let row_size = addr_size + (usize::from(self.info.columns) - 1) * 4;
 
         let addr = match addr {
             IpAddr::V4(addr) => IpAddr::V4(min(addr, Ipv4Addr::from(u32::MAX - 1))),
@@ -171,14 +173,14 @@ impl Database {
         let mut buffer = [0; 16 + 16 + (MAX_COLUMNS - 1) * 4];
 
         while low_row <= high_row {
+            dbg!(low_row, high_row);
             let mid_row = mid(low_row, high_row);
 
             // TODO: overflow
             let row_ptr = base_ptr + mid_row * row_size as u32;
-            let next_row_ptr = base_ptr + row_size as u32;
 
             let buf = &mut buffer[..(row_size + addr_size) as usize];
-            self.raf.read_exact_at(u64::from(row_ptr), buf)?;
+            self.raf.read_exact_at(u64::from(row_ptr) - 1, buf)?; // TODO
 
             let below = match addr {
                 IpAddr::V4(addr) => addr < Ipv4Addr::from(LE::read_u32(buf)),
@@ -195,6 +197,7 @@ impl Database {
             } else if above {
                 low_row = mid_row + 1; // overflow
             } else {
+                println!("found!");
                 return Ok(Some(self.read_row(&buf[addr_size..row_size], query)?));
             }
         }
