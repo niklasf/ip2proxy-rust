@@ -1,0 +1,11 @@
+[package]
+name = "ip2proxy"
+version = "0.1.0" # remember to update changelog and html_root_url
+description = "Probe IP2Proxy BIN data files"
+repository = "https://github.com/niklasf/ip2proxy-rust"
+readme = "README.md"
+authors = ["Niklas Fiekas <niklas.fiekas@backscattering.de>"]
+license = "MIT OR APACHE-2.0"
+keywords = ["ip", "proxy", "geolocation"]
+categories = ["web-programming", "parser-implementations"]
+edition = "2018"
