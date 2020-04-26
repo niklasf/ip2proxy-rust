@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::path::Path;
 use std::io;
 use std::net::Ipv4Addr;
@@ -29,6 +31,21 @@ bitflags! {
         const PX7 = Columns::PX6.bits | Columns::ASN.bits | Columns::AS.bits;
         const PX8 = Columns::PX7.bits | Columns::LAST_SEEN.bits;
     }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Record {
+    proxy_type: Option<BString>,
+    country_short: Option<BString>,
+    country_long: Option<BString>,
+    region: Option<BString>,
+    city: Option<BString>,
+    isp: Option<BString>,
+    domain: Option<BString>,
+    usage_type: Option<BString>,
+    asn: Option<BString>,
+    as_: Option<BString>,
+    last_seen: Option<BString>,
 }
 
 const PX: [Columns; 9] = [
@@ -75,9 +92,6 @@ const INDEX_SIZE: usize = 65536;
 
 const PROXYTYPE_POS: [u64; 9] = [0, 0, 2, 2, 2, 2, 2, 2, 2];
 
-struct QueryResult {
-    proxy_type: u32,
-}
 
 impl Database {
     fn open<P: AsRef<Path>>(path: P) -> io::Result<Database> {
