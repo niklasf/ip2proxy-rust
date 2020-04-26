@@ -2,6 +2,7 @@
 
 use std::path::Path;
 use std::io;
+use std::io::Read;
 use std::net::Ipv4Addr;
 
 use bitflags::bitflags;
@@ -175,12 +176,7 @@ impl Database {
 
         let mut row = Row::default();
 
-        if self.columns.contains(Columns::PROXY_TYPE) {
-            let offset = cursor.read_u32::<LE>()?;
-            if query.contains(Columns::PROXY_TYPE) {
-                row.proxy_type = Some(self.read_str(offset)?);
-            }
-        }
+        self.read_col(&mut cursor, query, &mut row, Columns::PROXY_TYPE);
 
         if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
             let offset = cursor.read_u32::<LE>()?;
@@ -192,7 +188,26 @@ impl Database {
             }
         }
 
+        self.read_col(&mut cursor, query, &mut row, Columns::REGION);
+        self.read_col(&mut cursor, query, &mut row, Columns::CITY);
+        self.read_col(&mut cursor, query, &mut row, Columns::ISP);
+        self.read_col(&mut cursor, query, &mut row, Columns::DOMAIN);
+        self.read_col(&mut cursor, query, &mut row, Columns::USAGE_TYPE);
+        self.read_col(&mut cursor, query, &mut row, Columns::ASN);
+        self.read_col(&mut cursor, query, &mut row, Columns::AS);
+        self.read_col(&mut cursor, query, &mut row, Columns::LAST_SEEN);
+
         Ok(row)
+    }
+
+    fn read_col<R: Read>(&self, mut reader: R, query: Columns, row: &mut Row, column: Columns) -> io::Result<()> {
+        if self.columns.contains(column) {
+            let offset = reader.read_u32::<LE>()?;
+            if query.contains(column) {
+                row.proxy_type = Some(self.read_str(offset)?);
+            }
+        }
+        Ok(())
     }
 
     fn read_str(&self, pos: u32) -> io::Result<BString> {
