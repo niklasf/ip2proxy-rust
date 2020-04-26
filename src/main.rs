@@ -11,19 +11,20 @@ use positioned_io::{Cursor, Slice, RandomAccessFile, ReadBytesAtExt as _, ReadAt
 
 bitflags! {
     pub struct Columns: u32 {
-        const PROXY_TYPE = 1 << 0;
-        const COUNTRY    = 1 << 1;
-        const REGION     = 1 << 2;
-        const CITY       = 1 << 3;
-        const ISP        = 1 << 4;
-        const DOMAIN     = 1 << 5;
-        const USAGE_TYPE = 1 << 6;
-        const ASN        = 1 << 7;
-        const AS         = 1 << 8;
-        const LAST_SEEN  = 1 << 9;
+        const PROXY_TYPE    = 1 <<  0;
+        const COUNTRY_SHORT = 1 <<  1;
+        const COUNTRY_LONG  = 1 <<  2;
+        const REGION        = 1 <<  3;
+        const CITY          = 1 <<  4;
+        const ISP           = 1 <<  5;
+        const DOMAIN        = 1 <<  6;
+        const USAGE_TYPE    = 1 <<  7;
+        const ASN           = 1 <<  8;
+        const AS            = 1 <<  9;
+        const LAST_SEEN     = 1 << 10;
 
-        const PX1 = Columns::COUNTRY.bits;
-        const PX2 = Columns::PROXY_TYPE.bits | Columns::COUNTRY.bits;
+        const PX1 = Columns::COUNTRY_SHORT.bits | Columns::COUNTRY_LONG.bits;
+        const PX2 = Columns::PROXY_TYPE.bits | Columns::PX1.bits;
         const PX3 = Columns::PX2.bits | Columns::REGION.bits | Columns::CITY.bits;
         const PX4 = Columns::PX3.bits | Columns::ISP.bits;
         const PX5 = Columns::PX4.bits | Columns::DOMAIN.bits;
@@ -168,13 +169,27 @@ impl Database {
     }
 
     fn read_row(&self, pos: u32, len: u32, query: Columns) -> io::Result<Row> {
-        let slice = Slice::new(&self.raf, u64::from(pos), Some(u64::from(len)));
-        let mut cursor = Cursor::new(slice);
+        let mut buffer = vec![0; len as usize]; // TODO: allocation size
+        self.raf.read_exact_at(u64::from(pos), &mut buffer)?;
+        let mut cursor = io::Cursor::new(buffer);
+
         let mut row = Row::default();
 
         if self.columns.contains(Columns::PROXY_TYPE) {
             let offset = cursor.read_u32::<LE>()?;
-            row.proxy_type = Some(self.read_str(offset)?);
+            if query.contains(Columns::PROXY_TYPE) {
+                row.proxy_type = Some(self.read_str(offset)?);
+            }
+        }
+
+        if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
+            let offset = cursor.read_u32::<LE>()?;
+            if query.contains(Columns::COUNTRY_SHORT) {
+                row.country_short = Some(self.read_str(offset)?);
+            }
+            if query.contains(Columns::COUNTRY_LONG) {
+                row.country_long = Some(self.read_str(offset + 3)?); // TODO: overflow
+            }
         }
 
         Ok(row)
