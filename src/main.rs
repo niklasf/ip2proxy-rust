@@ -9,18 +9,39 @@ use bitflags::bitflags;
 
 bitflags! {
     pub struct Columns: u32 {
-        const COUNTRY    = 1 << 0;
-        const REGION     = 1 << 1;
-        const CITY       = 1 << 2;
-        const ISP        = 1 << 3;
-        const PROXY_TYPE = 1 << 4;
+        const PROXY_TYPE = 1 << 0;
+        const COUNTRY    = 1 << 1;
+        const REGION     = 1 << 2;
+        const CITY       = 1 << 3;
+        const ISP        = 1 << 4;
         const DOMAIN     = 1 << 5;
         const USAGE_TYPE = 1 << 6;
         const ASN        = 1 << 7;
         const AS         = 1 << 8;
         const LAST_SEEN  = 1 << 9;
+
+        const PX1 = Columns::COUNTRY.bits;
+        const PX2 = Columns::PROXY_TYPE.bits | Columns::COUNTRY.bits;
+        const PX3 = Columns::PX2.bits | Columns::REGION.bits | Columns::CITY.bits;
+        const PX4 = Columns::PX3.bits | Columns::ISP.bits;
+        const PX5 = Columns::PX4.bits | Columns::DOMAIN.bits;
+        const PX6 = Columns::PX5.bits | Columns::USAGE_TYPE.bits;
+        const PX7 = Columns::PX6.bits | Columns::ASN.bits | Columns::AS.bits;
+        const PX8 = Columns::PX7.bits | Columns::LAST_SEEN.bits;
     }
 }
+
+const PX: [Columns; 9] = [
+    Columns::empty(),
+    Columns::PX1,
+    Columns::PX2,
+    Columns::PX3,
+    Columns::PX4,
+    Columns::PX5,
+    Columns::PX6,
+    Columns::PX7,
+    Columns::PX8,
+];
 
 #[derive(Debug)]
 struct Database {
