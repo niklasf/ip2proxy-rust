@@ -1,11 +1,11 @@
 IP2Proxy Rust Library
 =====================
 
-[![Test](https://github.com/niklasf/ip2proxy/workflows/Test/badge.svg)](https://github.com/niklasf/ip2proxy/actions)
+[![Test](https://github.com/niklasf/ip2proxy-rust/workflows/Test/badge.svg)](https://github.com/niklasf/ip2proxy-rust/actions)
 [![crates.io](https://img.shields.io/crates/v/ip2proxy.svg)](https://crates.io/crates/ip2proxy)
 [![docs.rs](https://docs.rs/ip2proxy/badge.svg)](https://docs.rs/ip2proxy)
 
-Library to query **IP2Proxy BIN Data** files. These files contain known
+Library to query **IP2Proxy BIN Data** files. The database files contain known
 proxies, geolocation information, and other meta data.
 
 https://www.ip2location.com/ is a commercial provider for these database files.
