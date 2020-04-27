@@ -88,6 +88,9 @@ bitflags! {
         /// See [`Row::last_seen`](struct.Row.html#structfield.last_seen).
         const LAST_SEEN     = 1 << 10;
 
+        /// See [`Row::is_proxy()`](struct.Row.html#method.is_proxy).
+        const IS_PROXY = Columns::PROXY_TYPE.bits | Columns::COUNTRY_SHORT.bits;
+
         /// Alias for columns of PX1: IP-Country Database.
         const PX1 = Columns::COUNTRY_SHORT.bits | Columns::COUNTRY_LONG.bits;
         /// Alias for columns of PX2: IP-ProxyType-Country Database.
@@ -114,36 +117,41 @@ bitflags! {
 ///
 /// Use [`Database::query()`](struct.Database.html#method.query) to obtain this
 /// from a database.
+///
+/// By convention, `-` is used for fields where the column is supported but
+/// the row does not have a value.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
 pub struct Row {
     /// Type of proxy, if any.
     ///
     /// | Proxy type | Description |
     /// | --- | --- |
-    /// | `VPN` | Known VPN |
+    /// | `VPN` | Anonymizing VPN service |
     /// | `TOR` | Tor exit node |
-    /// | `DCH` | Hosting provider, data center, CDN |
+    /// | `DCH` | Data center, hosting provider, CDN |
     /// | `PUB` | Public proxy |
     /// | `WEB` | Web based proxy |
     /// | `SES` | Search engine spider |
     pub proxy_type: Option<String>,
 
-    /// ISO 3166 country code.
+    /// ISO 3166 country code like `US`.
     pub country_short: Option<String>,
 
-    /// ISO 3166 country name.
+    /// ISO 3166 country name like `United States of America`.
     pub country_long: Option<String>,
 
-    /// Region or state name.
+    /// Region or state name like `California`.
     pub region: Option<String>,
 
-    /// City name.
+    /// City name like `Los Angeles`.
     pub city: Option<String>,
 
-    /// Internet service provider or company name.
+    /// Internet service provider or company name, like
+    /// `APNIC and CloudFlare DNS Resolver Project`.
     pub isp: Option<String>,
 
-    /// Domain associated with the IP address, if any.
+    /// Domain name associated with the IP address, if any,
+    /// like `cloudflare.com`.
     pub domain: Option<String>,
 
     /// Usage type classification.
@@ -164,14 +172,33 @@ pub struct Row {
     /// | `RSV` | Reserved |
     pub usage_type: Option<String>,
 
-    /// Autonomous System Number (ASN).
+    /// Autonomous System Number (ASN), like `13335`.
     pub asn: Option<String>,
 
-    /// Autonomous System (AS) name.
+    /// Autonomous System (AS) name, like `CLOUDFLARENET`.
     pub as_name: Option<String>,
 
     /// Number of days since the proxy was last seen.
     pub last_seen: Option<String>,
+}
+
+impl Row {
+    /// Checks if the row represents a known proxy of any kind.
+    pub fn is_proxy(&self) -> Option<bool> {
+        if let Some(ref country_short) = self.country_short {
+            if country_short == "-" {
+                return Some(false);
+            }
+        }
+        if let Some(ref proxy_type) = self.proxy_type {
+            if proxy_type == "-" {
+                return Some(false);
+            } else {
+                return Some(true);
+            }
+        }
+        None
+    }
 }
 
 const PX: [Columns; 9] = [
@@ -220,6 +247,8 @@ impl Database {
     ///
     /// The [`Columns`](struct.Columns.html) parameter allows optimizing the
     /// lookup by limiting the number columns to retrieve.
+    ///
+    /// Returns a [`Row`](struct.Row.html), if any.
     ///
     /// # Example
     ///
