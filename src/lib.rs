@@ -161,15 +161,15 @@ const PX: [Columns; 9] = [
 
 /// An ip2proxy database.
 #[derive(Debug)]
-pub struct Database<R> {
-    raf: R,
+pub struct Database {
+    raf: RandomAccessFile,
     header: Header,
     index_v4: Option<Index>,
     index_v6: Option<Index>,
     columns: Columns,
 }
 
-impl Database<RandomAccessFile> {
+impl Database {
     /// Open a database file.
     ///
     /// # Example
@@ -183,14 +183,13 @@ impl Database<RandomAccessFile> {
     ///
     /// # Errors
     ///
+    /// * Error while opening the file.
     /// * Error while reading from the file.
     /// * Invalid database header section or index section.
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         Self::new(RandomAccessFile::open(path)?)
     }
-}
 
-impl<R: ReadAt> Database<R> {
     /// Look up information for an IP address.
     ///
     /// The [`Columns`](struct.Columns.html) parameter allows optimizing the
@@ -204,6 +203,7 @@ impl<R: ReadAt> Database<R> {
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
     ///
     /// let ip = "1.0.0.1".parse()?;
+    ///
     /// if let Some(row) = db.query(ip, Columns::all())? {
     ///     // Record found.
     ///     assert_eq!(row.proxy_type, Some(String::from("DCH")));
@@ -224,6 +224,7 @@ impl<R: ReadAt> Database<R> {
     /// }
     ///
     /// let ip = "2001:0db8:85a3:0000:0000:8a2e:0370:7334".parse()?;
+    ///
     /// if let Some(row) = db.query(ip, Columns::all())? {
     ///     // This address has a matching record, but all columns are set to `-`.
     ///     assert_eq!(row.proxy_type, Some(String::from("-")));
@@ -317,33 +318,7 @@ impl<R: ReadAt> Database<R> {
         })
     }
 
-    /// Open a database from a source that supports
-    /// [`ReatAt`](../positioned_io_preview/trait.ReadAt.html).
-    ///
-    /// Use [`Database::open()`](struct.Database.html#method.open) if the
-    /// source is a file.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::fs::File;
-    /// use std::io::Read;
-    /// use ip2proxy::Database;
-    ///
-    /// // Read entire file into a buffer.
-    /// let mut source = Vec::new();
-    /// let mut file = File::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// file.read_to_end(&mut source);
-    ///
-    /// let db = Database::new(file)?;
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// * Error while reading from the source.
-    /// * Invalid database header section or index section.
-    pub fn new(raf: R) -> io::Result<Self> {
+    fn new(raf: RandomAccessFile) -> io::Result<Self> {
         let mut header_buf = [0; HEADER_LEN];
         raf.read_exact_at(0, &mut header_buf)?;
         let header = Header::read(&header_buf[..])?;
@@ -369,7 +344,7 @@ impl<R: ReadAt> Database<R> {
     }
 
 
-    fn read_country_col<S: Read>(&self, mut reader: S, query: Columns) -> io::Result<(Option<String>, Option<String>)> {
+    fn read_country_col<R: Read>(&self, mut reader: R, query: Columns) -> io::Result<(Option<String>, Option<String>)> {
         if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
             let country_short = match query.contains(Columns::COUNTRY_SHORT) {
@@ -386,7 +361,7 @@ impl<R: ReadAt> Database<R> {
         }
     }
 
-    fn read_col<S: Read>(&self, mut reader: S, query: Columns, column: Columns) -> io::Result<Option<String>> {
+    fn read_col<R: Read>(&self, mut reader: R, query: Columns, column: Columns) -> io::Result<Option<String>> {
         if self.columns.contains(column) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
             if query.contains(column) {
@@ -405,9 +380,14 @@ impl<R: ReadAt> Database<R> {
         self.raf.read_exact_at(ptr + 1, &mut buf)?; // ptr <= u32::MAX + 3
         String::from_utf8(buf).map_err(|_| io::Error::new(ErrorKind::InvalidData, "invalid utf-8 data"))
     }
-}
 
-impl<R> Database<R> {
+    fn query_index(&self, addr: IpAddr) -> Option<RowRange> {
+        match addr {
+            IpAddr::V4(addr) => self.index_v4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
+            IpAddr::V6(addr) => self.index_v6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
+        }
+    }
+
     /// Get meta data from the database header.
     ///
     /// # Example
@@ -442,13 +422,6 @@ impl<R> Database<R> {
     /// ```
     pub fn columns(&self) -> Columns {
         self.columns
-    }
-
-    fn query_index(&self, addr: IpAddr) -> Option<RowRange> {
-        match addr {
-            IpAddr::V4(addr) => self.index_v4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
-            IpAddr::V6(addr) => self.index_v6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
-        }
     }
 }
 
