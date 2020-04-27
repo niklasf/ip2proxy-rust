@@ -9,6 +9,8 @@
 // - Row accessors
 // - Serde for row
 // - Reduce allocations while reading row?
+// - Fuzzing
+// - CI
 
 #![forbid(unsafe_code)]
 
@@ -50,17 +52,17 @@ bitflags! {
 
 #[derive(Debug, Clone)]
 pub struct Row {
-    proxy_type: Option<BString>,
-    country_short: Option<BString>,
-    country_long: Option<BString>,
-    region: Option<BString>,
-    city: Option<BString>,
-    isp: Option<BString>,
-    domain: Option<BString>,
-    usage_type: Option<BString>,
-    asn: Option<BString>,
-    as_name: Option<BString>,
-    last_seen: Option<BString>,
+    pub proxy_type: Option<BString>,
+    pub country_short: Option<BString>,
+    pub country_long: Option<BString>,
+    pub region: Option<BString>,
+    pub city: Option<BString>,
+    pub isp: Option<BString>,
+    pub domain: Option<BString>,
+    pub usage_type: Option<BString>,
+    pub asn: Option<BString>,
+    pub as_name: Option<BString>,
+    pub last_seen: Option<BString>,
 }
 
 const PX: [Columns; 9] = [
