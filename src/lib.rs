@@ -1,15 +1,9 @@
 // TODO:
 // - Test v6
-// - Clippy
-// - Documentation
 // - Test 6to4
 // - Test teredo
-// - Database constructors
-// - Row accessors
 // - Serde for row
-// - Reduce allocations while reading row?
 // - Fuzzing
-// - CI
 
 //! Library to query **IP2Proxy BIN Data** files. They contain known proxies,
 //! geolocation information, and other meta data for IP address ranges.
@@ -66,7 +60,7 @@ bitflags! {
     /// ```
     pub struct Columns: u32 {
         /// See [`Row::proxy_type`](struct.Row.html#structfield.proxy_type).
-        const PROXY_TYPE    = 1 <<  0;
+        const PROXY_TYPE    = 1;
         /// See [`Row::country_short`](struct.Row.html#structfield.country_short).
         const COUNTRY_SHORT = 1 <<  1;
         /// See [`Row::country_long`](struct.Row.html#structfield.country_long).
@@ -201,18 +195,6 @@ impl Row {
     }
 }
 
-const PX: [Columns; 9] = [
-    Columns::empty(),
-    Columns::PX1,
-    Columns::PX2,
-    Columns::PX3,
-    Columns::PX4,
-    Columns::PX5,
-    Columns::PX6,
-    Columns::PX7,
-    Columns::PX8,
-];
-
 /// An ip2proxy database.
 #[derive(Debug)]
 pub struct Database {
@@ -279,9 +261,10 @@ impl Database {
         let addr = normalize_ip(addr);
 
         if let Some(RowRange { mut low_row, mut high_row }) = self.query_index(addr) {
-            let (base_ptr, addr_size) = match addr.is_ipv4() {
-                true => (self.header.base_ptr_v4, 4),
-                false => (self.header.base_ptr_v6, 16),
+            let (base_ptr, addr_size) = if addr.is_ipv4() {
+                (self.header.base_ptr_v4, 4)
+            } else {
+                (self.header.base_ptr_v6, 16)
             };
 
             if base_ptr == 0 {
@@ -361,13 +344,15 @@ impl Database {
         }
 
         Ok(Database {
-            index_v4: match header.index_ptr_v4 != 0 {
-                true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?),
-                false => None,
+            index_v4: if header.index_ptr_v4 != 0 {
+                Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?)
+            } else {
+                None
             },
-            index_v6: match header.index_ptr_v6 != 0 {
-                true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?),
-                false => None,
+            index_v6: if header.index_ptr_v6 != 0 {
+                Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?)
+            } else {
+                None
             },
             header,
             raf,
@@ -378,13 +363,15 @@ impl Database {
     fn read_country_col<R: Read>(&self, mut reader: R, query: Columns) -> io::Result<(Option<String>, Option<String>)> {
         if self.header.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
-            let country_short = match query.contains(Columns::COUNTRY_SHORT) {
-                true => Some(self.read_str(ptr)?),
-                false => None,
+            let country_short = if query.contains(Columns::COUNTRY_SHORT) {
+                Some(self.read_str(ptr)?)
+            } else {
+                None
             };
-            let country_long = match query.contains(Columns::COUNTRY_LONG) {
-                true => Some(self.read_str(ptr + 3)?), // ptr <= u32::MAX
-                false => None,
+            let country_long = if query.contains(Columns::COUNTRY_LONG) {
+                Some(self.read_str(ptr + 3)?) // ptr <= u32::MAX
+            } else {
+                None
             };
             Ok((country_short, country_long))
         } else {
@@ -465,7 +452,29 @@ fn mid(low_row: u32, high_row: u32) -> u32 {
     ((u64::from(low_row) + u64::from(high_row)) / 2) as u32
 }
 
-const HEADER_LEN: usize = 5 * 1 + 6 * 4;
+const HEADER_LEN: usize = 5 + 6 * 4;
+
+const MAX_COLUMNS: usize = 11;
+
+const PX: [Columns; 9] = [
+    Columns::empty(),
+    Columns::PX1,
+    Columns::PX2,
+    Columns::PX3,
+    Columns::PX4,
+    Columns::PX5,
+    Columns::PX6,
+    Columns::PX7,
+    Columns::PX8,
+];
+
+fn validate_columns(num_columns: u8) -> io::Result<u8> {
+    if num_columns < 1 || MAX_COLUMNS < usize::from(num_columns) {
+        Err(io::Error::new(io::ErrorKind::InvalidData, "invalid number of columns"))
+    } else {
+        Ok(num_columns)
+    }
+}
 
 /// A database header with meta information.
 ///
@@ -485,16 +494,6 @@ pub struct Header {
     index_ptr_v4: u32,
     index_ptr_v6: u32,
     columns: Columns,
-}
-
-const MAX_COLUMNS: usize = 11;
-
-fn validate_columns(num_columns: u8) -> io::Result<u8> {
-    if num_columns < 1 || MAX_COLUMNS < usize::from(num_columns) {
-        Err(io::Error::new(io::ErrorKind::InvalidData, "invalid number of columns"))
-    } else {
-        Ok(num_columns)
-    }
 }
 
 impl Header {
