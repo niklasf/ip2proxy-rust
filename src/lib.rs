@@ -133,12 +133,23 @@ impl<R> Database<R> {
     /// assert_eq!(header.day(), 17); // 17th
     /// assert_eq!(header.rows_ipv4(), 150);
     /// assert_eq!(header.rows_ipv6(), 4);
-    /// # Ok::<_, Box<Error>>(())
+    /// # Ok::<_, Box<std::error::Error>>(())
     /// ```
     pub fn header(&self) -> &Header {
         &self.header
     }
 
+    /// Get the set of supported columns.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ip2proxy::{Columns, Database};
+    ///
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// assert!(db.columns().contains(Columns::PROXY_TYPE));
+    /// # Ok::<_, Box<std::error::Error>>(())
+    /// ```
     pub fn columns(&self) -> Columns {
         self.columns
     }
@@ -152,12 +163,52 @@ impl<R> Database<R> {
 }
 
 impl Database<RandomAccessFile> {
+    /// Open a database file.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ip2proxy::Database;
+    ///
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// # Ok::<_, Box<std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// * Error while reading from the file.
+    /// * Invalid database header section or index section.
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         Self::new(RandomAccessFile::open(path)?)
     }
 }
 
 impl<R: ReadAt> Database<R> {
+    /// Open a database from a source that supports
+    /// [`ReatAt`](../positioned_io_preview/trait.ReadAt.html). Use
+    /// [`Database::open()`](struct.Database.html#method.open) if the source
+    /// if a file.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::fs::File;
+    /// use std::io::Read;
+    /// use ip2proxy::Database;
+    ///
+    /// // Read entire file into a buffer.
+    /// let mut source = Vec::new();
+    /// let mut file = File::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// file.read_to_end(&mut source);
+    ///
+    /// let db = Database::new(file)?;
+    /// # Ok::<_, Box<std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// * Error while reading from the source.
+    /// * Invalid database header section or index section.
     pub fn new(raf: R) -> io::Result<Self> {
         let mut header_buf = [0; HEADER_LEN];
         raf.read_exact_at(0, &mut header_buf)?;
@@ -183,6 +234,32 @@ impl<R: ReadAt> Database<R> {
         })
     }
 
+    /// Look information for an IP address.
+    ///
+    /// ```
+    /// use bstr::BString;
+    /// use ip2proxy::{Columns, Database};
+    ///
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    ///
+    /// let ip = "1.0.0.1".parse()?;
+    /// let row = db.query(ip, Columns::all())?.expect("row exists");
+    ///
+    /// assert_eq!(row.proxy_type, Some(BString::from("DCH")));
+    /// assert_eq!(row.country_short, Some(BString::from("AU")));
+    /// assert_eq!(row.country_long, Some(BString::from("Australia")));
+    /// assert_eq!(row.region, Some(BString::from("Queensland")));
+    /// assert_eq!(row.city, Some(BString::from("Brisbane")));
+    /// assert_eq!(row.isp, Some(BString::from("Research Prefix for APNIC Labs")));
+    ///
+    /// // The sample database does not have the following columns.
+    /// assert!(row.domain.is_none());
+    /// assert!(row.usage_type.is_none());
+    /// assert!(row.asn.is_none());
+    /// assert!(row.as_name.is_none());
+    /// assert!(row.last_seen.is_none());
+    /// # Ok::<_, Box<std::error::Error>>(())
+    /// ```
     pub fn query(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
         let addr = normalize_ip(addr);
 
