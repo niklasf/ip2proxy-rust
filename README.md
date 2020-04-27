@@ -6,7 +6,7 @@ IP2Proxy Rust Library
 [![docs.rs](https://docs.rs/ip2proxy/badge.svg)](https://docs.rs/ip2proxy)
 
 Library to query **IP2Proxy BIN Data** files. They contain known proxies,
-geolocation information, and other meta data.
+geolocation information, and other meta data for IP address ranges.
 
 https://www.ip2location.com/ is a commercial provider, offering various database
 files for download.
@@ -32,7 +32,6 @@ assert_eq!(row, Some(Row {
     isp: Some(String::from("Research Prefix for APNIC Labs")),
     ..Row::default()
 }));
-# Ok::<_, Box<dyn std::error::Error>>(())
 ```
 
 Documentation
@@ -40,15 +39,9 @@ Documentation
 
 [Read the documentation](https://docs.rs/ip2proxy)
 
-Changelog
----------
-
-* 0.1.0
-  - Initial release.
-
 License
 -------
 
 This is an independently developed open-source library, licensed under the
 MIT or Apache-2.0 license at your option. The author is not associated with
-IP2Location.com.
+*IP2Location.com*.

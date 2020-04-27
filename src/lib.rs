@@ -12,7 +12,7 @@
 // - CI
 
 //! Library to query **IP2Proxy BIN Data** files. They contain known proxies,
-//! geolocation information, and other meta data.
+//! geolocation information, and other meta data for IP address ranges.
 //!
 //! [https://www.ip2location.com/](https://www.ip2location.com/) is a
 //! commercial provider, offering various database files for download.
@@ -212,7 +212,7 @@ impl Database {
     ///
     /// * Error while opening the file.
     /// * Error while reading from the file.
-    /// * Invalid database header section or index section.
+    /// * Invalid data in header section or index section.
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         Self::new(RandomAccessFile::open(path)?)
     }
@@ -246,7 +246,7 @@ impl Database {
     /// # Errors
     ///
     /// * Error while reading from the source.
-    /// * Invalid record or data in string section.
+    /// * Invalid row or string data.
     pub fn query(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
         let addr = normalize_ip(addr);
 
