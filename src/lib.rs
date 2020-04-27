@@ -11,50 +11,32 @@
 // - Fuzzing
 // - CI
 
-//! Library to query **IP2Proxy BIN Data** files. The database files contain
-//! known proxies, geolocation information, and other meta data.
+//! Library to query **IP2Proxy BIN Data** files. They contain known proxies,
+//! geolocation information, and other meta data.
 //!
 //! [https://www.ip2location.com/](https://www.ip2location.com/) is a
-//! commercial provider for these database files.
+//! commercial provider, offering various database files for download.
+//!
+//! Supports IPv4 and IPv6.
 //!
 //! # Example
 //!
 //! ```rust
-//! use ip2proxy::{Columns, Database};
+//! use ip2proxy::{Columns, Database, Row};
 //!
 //! let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
 //!
-//! let ip = "1.0.0.1".parse()?;
+//! let row = db.query("1.0.0.1".parse()?, Columns::all())?;
 //!
-//! if let Some(row) = db.query(ip, Columns::all())? {
-//!     // Record found.
-//!     assert_eq!(row.proxy_type, Some(String::from("DCH")));
-//!     assert_eq!(row.country_short, Some(String::from("AU")));
-//!     assert_eq!(row.country_long, Some(String::from("Australia")));
-//!     assert_eq!(row.region, Some(String::from("Queensland")));
-//!     assert_eq!(row.city, Some(String::from("Brisbane")));
-//!     assert_eq!(row.isp, Some(String::from("Research Prefix for APNIC Labs")));
-//!
-//!     // The sample database does not have the following columns.
-//!     assert!(row.domain.is_none());
-//!     assert!(row.usage_type.is_none());
-//!     assert!(row.asn.is_none());
-//!     assert!(row.as_name.is_none());
-//!     assert!(row.last_seen.is_none());
-//! } else {
-//!     unreachable!("Sample database is known to contain this ip");
-//! }
-//!
-//! let ip = "2001:0db8:85a3:0000:0000:8a2e:0370:7334".parse()?;
-//!
-//! if let Some(row) = db.query(ip, Columns::all())? {
-//!     // This address has a matching record, but all columns are set to `-`.
-//!     assert_eq!(row.proxy_type, Some(String::from("-")));
-//!     assert_eq!(row.country_short, Some(String::from("-")));
-//!     assert_eq!(row.country_long, Some(String::from("-")));
-//! } else {
-//!     unreachable!("Sample database is known to contain this ip");
-//! }
+//! assert_eq!(row, Some(Row {
+//!     proxy_type: Some(String::from("DCH")),
+//!     country_short: Some(String::from("AU")),
+//!     country_long: Some(String::from("Australia")),
+//!     region: Some(String::from("Queensland")),
+//!     city: Some(String::from("Brisbane")),
+//!     isp: Some(String::from("Research Prefix for APNIC Labs")),
+//!     ..Row::default()
+//! }));
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
 
@@ -84,7 +66,7 @@ bitflags! {
     /// ```
     pub struct Columns: u32 {
         /// See [`Row::proxy_type`](struct.Row.html#structfield.proxy_type).
-        const PROXY_TYPE    = 1;
+        const PROXY_TYPE    = 1 <<  0;
         /// See [`Row::country_short`](struct.Row.html#structfield.country_short).
         const COUNTRY_SHORT = 1 <<  1;
         /// See [`Row::country_long`](struct.Row.html#structfield.country_long).
@@ -132,7 +114,7 @@ bitflags! {
 ///
 /// Use [`Database::query()`](struct.Database.html#method.query) to obtain this
 /// from a database.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
 pub struct Row {
     /// Type of proxy, if any.
     ///
@@ -190,8 +172,6 @@ pub struct Row {
 
     /// Number of days since the proxy was last seen.
     pub last_seen: Option<String>,
-
-    _priv: (),
 }
 
 const PX: [Columns; 9] = [
@@ -244,42 +224,22 @@ impl Database {
     ///
     /// # Example
     ///
-    /// ```
-    /// use ip2proxy::{Columns, Database};
+    /// ```rust
+    /// use ip2proxy::{Columns, Database, Row};
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
     ///
-    /// let ip = "1.0.0.1".parse()?;
+    /// let row = db.query("1.0.0.1".parse()?, Columns::all())?;
     ///
-    /// if let Some(row) = db.query(ip, Columns::all())? {
-    ///     // Record found.
-    ///     assert_eq!(row.proxy_type, Some(String::from("DCH")));
-    ///     assert_eq!(row.country_short, Some(String::from("AU")));
-    ///     assert_eq!(row.country_long, Some(String::from("Australia")));
-    ///     assert_eq!(row.region, Some(String::from("Queensland")));
-    ///     assert_eq!(row.city, Some(String::from("Brisbane")));
-    ///     assert_eq!(row.isp, Some(String::from("Research Prefix for APNIC Labs")));
-    ///
-    ///     // The sample database does not have the following columns.
-    ///     assert!(row.domain.is_none());
-    ///     assert!(row.usage_type.is_none());
-    ///     assert!(row.asn.is_none());
-    ///     assert!(row.as_name.is_none());
-    ///     assert!(row.last_seen.is_none());
-    /// } else {
-    ///     unreachable!("Sample database is known to contain this ip");
-    /// }
-    ///
-    /// let ip = "2001:0db8:85a3:0000:0000:8a2e:0370:7334".parse()?;
-    ///
-    /// if let Some(row) = db.query(ip, Columns::all())? {
-    ///     // This address has a matching record, but all columns are set to `-`.
-    ///     assert_eq!(row.proxy_type, Some(String::from("-")));
-    ///     assert_eq!(row.country_short, Some(String::from("-")));
-    ///     assert_eq!(row.country_long, Some(String::from("-")));
-    /// } else {
-    ///     unreachable!("Sample database is known to contain this ip");
-    /// }
+    /// assert_eq!(row, Some(Row {
+    ///     proxy_type: Some(String::from("DCH")),
+    ///     country_short: Some(String::from("AU")),
+    ///     country_long: Some(String::from("Australia")),
+    ///     region: Some(String::from("Queensland")),
+    ///     city: Some(String::from("Brisbane")),
+    ///     isp: Some(String::from("Research Prefix for APNIC Labs")),
+    ///     ..Row::default()
+    /// }));
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     ///
@@ -291,10 +251,9 @@ impl Database {
         let addr = normalize_ip(addr);
 
         if let Some(RowRange { mut low_row, mut high_row }) = self.query_index(addr) {
-            let (base_ptr, addr_size) = if addr.is_ipv4() {
-                (self.header.base_ptr_v4, 4)
-            } else {
-                (self.header.base_ptr_v6, 16)
+            let (base_ptr, addr_size) = match addr.is_ipv4() {
+                true => (self.header.base_ptr_v4, 4),
+                false => (self.header.base_ptr_v6, 16),
             };
 
             if base_ptr == 0 {
@@ -362,7 +321,6 @@ impl Database {
             asn: self.read_col(&mut cursor, query, Columns::ASN)?,
             as_name: self.read_col(&mut cursor, query, Columns::AS_NAME)?,
             last_seen: self.read_col(&mut cursor, query, Columns::LAST_SEEN)?,
-            _priv: (),
         })
     }
 
@@ -371,22 +329,20 @@ impl Database {
         raf.read_exact_at(0, &mut header_buf)?;
         let header = Header::read(&header_buf[..])?;
 
-        let columns = PX.get(usize::from(header.px)).copied().unwrap_or_else(Columns::empty);
+        let columns = PX.get(usize::from(header.px)).copied().unwrap_or(Columns::empty());
         if columns.is_empty() {
             return Err(io::Error::new(ErrorKind::InvalidData, "only px1 - px8 supported"));
         }
 
         Ok(Database {
             columns,
-            index_v4: if header.index_ptr_v4 != 0 {
-                Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?)
-            } else {
-                None
+            index_v4: match header.index_ptr_v4 != 0 {
+                true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?),
+                false => None,
             },
-            index_v6: if header.index_ptr_v6 != 0 {
-                Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?)
-            } else {
-                None
+            index_v6: match header.index_ptr_v6 != 0 {
+                true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?),
+                false => None,
             },
             raf,
             header,
@@ -397,15 +353,13 @@ impl Database {
     fn read_country_col<R: Read>(&self, mut reader: R, query: Columns) -> io::Result<(Option<String>, Option<String>)> {
         if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
-            let country_short = if query.contains(Columns::COUNTRY_SHORT) {
-                Some(self.read_str(ptr)?)
-            } else {
-                None
+            let country_short = match query.contains(Columns::COUNTRY_SHORT) {
+                true => Some(self.read_str(ptr)?),
+                false => None,
             };
-            let country_long = if query.contains(Columns::COUNTRY_LONG) {
-                Some(self.read_str(ptr + 3)?) // ptr <= u32::MAX
-            } else {
-                None
+            let country_long = match query.contains(Columns::COUNTRY_LONG) {
+                true => Some(self.read_str(ptr + 3)?), // ptr <= u32::MAX
+                false => None,
             };
             Ok((country_short, country_long))
         } else {
@@ -501,7 +455,7 @@ fn mid(low_row: u32, high_row: u32) -> u32 {
     ((u64::from(low_row) + u64::from(high_row)) / 2) as u32
 }
 
-const HEADER_LEN: usize = 5 + 6 * 4;
+const HEADER_LEN: usize = 5 * 1 + 6 * 4;
 
 /// A database header with meta information.
 ///
