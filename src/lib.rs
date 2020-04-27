@@ -108,6 +108,7 @@ const PX: [Columns; 9] = [
     Columns::PX8,
 ];
 
+/// An ip2proxy database.
 pub struct Database<R> {
     raf: R,
     header: Header,
@@ -117,6 +118,23 @@ pub struct Database<R> {
 }
 
 impl<R> Database<R> {
+    /// Get meta data from the database header.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ip2proxy::Database;
+    ///
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// let header = db.header();
+    /// assert_eq!(header.px(), 4);
+    /// assert_eq!(header.year(), 16); // 2016
+    /// assert_eq!(header.month(), 11); // November
+    /// assert_eq!(header.day(), 17); // 17th
+    /// assert_eq!(header.rows_ipv4(), 150);
+    /// assert_eq!(header.rows_ipv6(), 4);
+    /// # Ok::<_, Box<Error>>(())
+    /// ```
     pub fn header(&self) -> &Header {
         &self.header
     }
