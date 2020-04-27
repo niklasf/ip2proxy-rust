@@ -193,7 +193,6 @@ pub struct Database {
     header: Header,
     index_v4: Option<Index>,
     index_v6: Option<Index>,
-    columns: Columns,
 }
 
 impl Database {
@@ -328,14 +327,11 @@ impl Database {
         let mut header_buf = [0; HEADER_LEN];
         raf.read_exact_at(0, &mut header_buf)?;
         let header = Header::read(&header_buf[..])?;
-
-        let columns = PX.get(usize::from(header.px)).copied().unwrap_or(Columns::empty());
-        if columns.is_empty() {
+        if header.columns.is_empty() {
             return Err(io::Error::new(ErrorKind::InvalidData, "only px1 - px8 supported"));
         }
 
         Ok(Database {
-            columns,
             index_v4: match header.index_ptr_v4 != 0 {
                 true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?),
                 false => None,
@@ -344,14 +340,14 @@ impl Database {
                 true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?),
                 false => None,
             },
-            raf,
             header,
+            raf,
         })
     }
 
 
     fn read_country_col<R: Read>(&self, mut reader: R, query: Columns) -> io::Result<(Option<String>, Option<String>)> {
-        if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
+        if self.header.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
             let country_short = match query.contains(Columns::COUNTRY_SHORT) {
                 true => Some(self.read_str(ptr)?),
@@ -368,7 +364,7 @@ impl Database {
     }
 
     fn read_col<R: Read>(&self, mut reader: R, query: Columns, column: Columns) -> io::Result<Option<String>> {
-        if self.columns.contains(column) {
+        if self.header.columns.contains(column) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
             if query.contains(column) {
                 return Ok(Some(self.read_str(ptr)?));
@@ -413,21 +409,6 @@ impl Database {
     /// ```
     pub fn header(&self) -> &Header {
         &self.header
-    }
-
-    /// Get the set of supported columns.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use ip2proxy::{Columns, Database};
-    ///
-    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// assert!(db.columns().contains(Columns::PROXY_TYPE));
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn columns(&self) -> Columns {
-        self.columns
     }
 }
 
@@ -474,6 +455,7 @@ pub struct Header {
     base_ptr_v6: u32,
     index_ptr_v4: u32,
     index_ptr_v6: u32,
+    columns: Columns,
 }
 
 const MAX_COLUMNS: usize = 11;
@@ -488,8 +470,10 @@ fn validate_columns(num_columns: u8) -> io::Result<u8> {
 
 impl Header {
     fn read<R: Read>(mut reader: R) -> io::Result<Header> {
+        let px = reader.read_u8()?;
         Ok(Header {
-            px: reader.read_u8()?,
+            px,
+            columns: PX.get(usize::from(px)).copied().unwrap_or_else(Columns::empty),
             num_columns: validate_columns(reader.read_u8()?)?,
             year: reader.read_u8()?,
             month: reader.read_u8()?,
@@ -534,6 +518,21 @@ impl Header {
     /// so there may be information for many more IP addresses.
     pub fn rows_ipv6(&self) -> u32 {
         self.rows_v6
+    }
+
+    /// Get the set of supported columns.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ip2proxy::{Columns, Database};
+    ///
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// assert!(db.header().columns().contains(Columns::PROXY_TYPE));
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn columns(&self) -> Columns {
+        self.columns
     }
 }
 
