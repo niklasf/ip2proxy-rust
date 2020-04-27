@@ -169,51 +169,6 @@ pub struct Database<R> {
     columns: Columns,
 }
 
-impl<R> Database<R> {
-    /// Get meta data from the database header.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use ip2proxy::Database;
-    ///
-    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// let header = db.header();
-    /// assert_eq!(header.px(), 4);
-    /// assert_eq!(header.year(), 16); // 2016
-    /// assert_eq!(header.month(), 11); // November
-    /// assert_eq!(header.day(), 17); // 17th
-    /// assert_eq!(header.rows_ipv4(), 150);
-    /// assert_eq!(header.rows_ipv6(), 4);
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn header(&self) -> &Header {
-        &self.header
-    }
-
-    /// Get the set of supported columns.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use ip2proxy::{Columns, Database};
-    ///
-    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// assert!(db.columns().contains(Columns::PROXY_TYPE));
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn columns(&self) -> Columns {
-        self.columns
-    }
-
-    fn query_index(&self, addr: IpAddr) -> Option<RowRange> {
-        match addr {
-            IpAddr::V4(addr) => self.index_v4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
-            IpAddr::V6(addr) => self.index_v6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
-        }
-    }
-}
-
 impl Database<RandomAccessFile> {
     /// Open a database file.
     ///
@@ -236,57 +191,6 @@ impl Database<RandomAccessFile> {
 }
 
 impl<R: ReadAt> Database<R> {
-    /// Open a database from a source that supports
-    /// [`ReatAt`](../positioned_io_preview/trait.ReadAt.html).
-    ///
-    /// Use [`Database::open()`](struct.Database.html#method.open) if the
-    /// source is a file.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::fs::File;
-    /// use std::io::Read;
-    /// use ip2proxy::Database;
-    ///
-    /// // Read entire file into a buffer.
-    /// let mut source = Vec::new();
-    /// let mut file = File::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// file.read_to_end(&mut source);
-    ///
-    /// let db = Database::new(file)?;
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// * Error while reading from the source.
-    /// * Invalid database header section or index section.
-    pub fn new(raf: R) -> io::Result<Self> {
-        let mut header_buf = [0; HEADER_LEN];
-        raf.read_exact_at(0, &mut header_buf)?;
-        let header = Header::read(&header_buf[..])?;
-
-        let columns = PX.get(usize::from(header.px)).copied().unwrap_or(Columns::empty());
-        if columns.is_empty() {
-            return Err(io::Error::new(ErrorKind::InvalidData, "only px1 - px8 supported"));
-        }
-
-        Ok(Database {
-            columns,
-            index_v4: match header.index_ptr_v4 != 0 {
-                true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?),
-                false => None,
-            },
-            index_v6: match header.index_ptr_v6 != 0 {
-                true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?),
-                false => None,
-            },
-            raf,
-            header,
-        })
-    }
-
     /// Look up information for an IP address.
     ///
     /// The [`Columns`](struct.Columns.html) parameter allows optimizing the
@@ -413,6 +317,58 @@ impl<R: ReadAt> Database<R> {
         })
     }
 
+    /// Open a database from a source that supports
+    /// [`ReatAt`](../positioned_io_preview/trait.ReadAt.html).
+    ///
+    /// Use [`Database::open()`](struct.Database.html#method.open) if the
+    /// source is a file.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::fs::File;
+    /// use std::io::Read;
+    /// use ip2proxy::Database;
+    ///
+    /// // Read entire file into a buffer.
+    /// let mut source = Vec::new();
+    /// let mut file = File::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// file.read_to_end(&mut source);
+    ///
+    /// let db = Database::new(file)?;
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// * Error while reading from the source.
+    /// * Invalid database header section or index section.
+    pub fn new(raf: R) -> io::Result<Self> {
+        let mut header_buf = [0; HEADER_LEN];
+        raf.read_exact_at(0, &mut header_buf)?;
+        let header = Header::read(&header_buf[..])?;
+
+        let columns = PX.get(usize::from(header.px)).copied().unwrap_or(Columns::empty());
+        if columns.is_empty() {
+            return Err(io::Error::new(ErrorKind::InvalidData, "only px1 - px8 supported"));
+        }
+
+        Ok(Database {
+            columns,
+            index_v4: match header.index_ptr_v4 != 0 {
+                true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?),
+                false => None,
+            },
+            index_v6: match header.index_ptr_v6 != 0 {
+                true => Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?),
+                false => None,
+            },
+            raf,
+            header,
+        })
+    }
+
+
     fn read_country_col<S: Read>(&self, mut reader: S, query: Columns) -> io::Result<(Option<String>, Option<String>)> {
         if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
@@ -448,6 +404,51 @@ impl<R: ReadAt> Database<R> {
         let mut buf = vec![0; usize::from(len)];
         self.raf.read_exact_at(ptr + 1, &mut buf)?; // ptr <= u32::MAX + 3
         String::from_utf8(buf).map_err(|_| io::Error::new(ErrorKind::InvalidData, "invalid utf-8 data"))
+    }
+}
+
+impl<R> Database<R> {
+    /// Get meta data from the database header.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ip2proxy::Database;
+    ///
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// let header = db.header();
+    /// assert_eq!(header.px(), 4);
+    /// assert_eq!(header.year(), 16); // 2016
+    /// assert_eq!(header.month(), 11); // November
+    /// assert_eq!(header.day(), 17); // 17th
+    /// assert_eq!(header.rows_ipv4(), 150);
+    /// assert_eq!(header.rows_ipv6(), 4);
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+
+    /// Get the set of supported columns.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ip2proxy::{Columns, Database};
+    ///
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// assert!(db.columns().contains(Columns::PROXY_TYPE));
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn columns(&self) -> Columns {
+        self.columns
+    }
+
+    fn query_index(&self, addr: IpAddr) -> Option<RowRange> {
+        match addr {
+            IpAddr::V4(addr) => self.index_v4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
+            IpAddr::V6(addr) => self.index_v6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
+        }
     }
 }
 
