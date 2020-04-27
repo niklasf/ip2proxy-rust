@@ -16,12 +16,11 @@
 
 use std::path::Path;
 use std::io;
-use std::io::Read;
+use std::io::{ErrorKind, Read};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::cmp::min;
 
 use bitflags::bitflags;
-use bstr::BString;
 use byteorder::{LE, ReadBytesExt as _, ByteOrder as _};
 use positioned_io::{Cursor, RandomAccessFile, ReadAt, ReadBytesAtExt as _};
 
@@ -97,25 +96,25 @@ pub struct Row {
     /// | PUB | Public proxy |
     /// | WEB | Web based proxy |
     /// | SES | Search engine spider |
-    pub proxy_type: Option<BString>,
+    pub proxy_type: Option<String>,
 
     /// ISO 3166 country code.
-    pub country_short: Option<BString>,
+    pub country_short: Option<String>,
 
     /// ISO 3166 country name.
-    pub country_long: Option<BString>,
+    pub country_long: Option<String>,
 
     /// Region or state name.
-    pub region: Option<BString>,
+    pub region: Option<String>,
 
     /// City name.
-    pub city: Option<BString>,
+    pub city: Option<String>,
 
     /// Internet service provider or company name.
-    pub isp: Option<BString>,
+    pub isp: Option<String>,
 
     /// Domain associated with the IP address, if any.
-    pub domain: Option<BString>,
+    pub domain: Option<String>,
 
     /// Usage type classification.
     ///
@@ -133,16 +132,16 @@ pub struct Row {
     /// | DCH | Data center, hosting provider, transit |
     /// | SES | Search engine spider |
     /// | RSV | Reserved |
-    pub usage_type: Option<BString>,
+    pub usage_type: Option<String>,
 
     /// Autonomous System Number (ASN).
-    pub asn: Option<BString>,
+    pub asn: Option<String>,
 
     /// Autonomous System (AS) name.
-    pub as_name: Option<BString>,
+    pub as_name: Option<String>,
 
     /// Number of days since the proxy was last seen.
-    pub last_seen: Option<BString>,
+    pub last_seen: Option<String>,
 
     _priv: (),
 }
@@ -268,7 +267,7 @@ impl<R: ReadAt> Database<R> {
 
         let columns = PX.get(usize::from(header.px)).copied().unwrap_or(Columns::empty());
         if columns.is_empty() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "only px1 - px8 supported"));
+            return Err(io::Error::new(ErrorKind::InvalidData, "only px1 - px8 supported"));
         }
 
         Ok(Database {
@@ -294,7 +293,6 @@ impl<R: ReadAt> Database<R> {
     /// # Example
     ///
     /// ```
-    /// use bstr::BString;
     /// use ip2proxy::{Columns, Database};
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
@@ -302,12 +300,12 @@ impl<R: ReadAt> Database<R> {
     /// let ip = "1.0.0.1".parse()?;
     /// if let Some(row) = db.query(ip, Columns::all())? {
     ///     // Record found.
-    ///     assert_eq!(row.proxy_type, Some(BString::from("DCH")));
-    ///     assert_eq!(row.country_short, Some(BString::from("AU")));
-    ///     assert_eq!(row.country_long, Some(BString::from("Australia")));
-    ///     assert_eq!(row.region, Some(BString::from("Queensland")));
-    ///     assert_eq!(row.city, Some(BString::from("Brisbane")));
-    ///     assert_eq!(row.isp, Some(BString::from("Research Prefix for APNIC Labs")));
+    ///     assert_eq!(row.proxy_type, Some(String::from("DCH")));
+    ///     assert_eq!(row.country_short, Some(String::from("AU")));
+    ///     assert_eq!(row.country_long, Some(String::from("Australia")));
+    ///     assert_eq!(row.region, Some(String::from("Queensland")));
+    ///     assert_eq!(row.city, Some(String::from("Brisbane")));
+    ///     assert_eq!(row.isp, Some(String::from("Research Prefix for APNIC Labs")));
     ///
     ///     // The sample database does not have the following columns.
     ///     assert!(row.domain.is_none());
@@ -322,9 +320,9 @@ impl<R: ReadAt> Database<R> {
     /// let ip = "2001:0db8:85a3:0000:0000:8a2e:0370:7334".parse()?;
     /// if let Some(row) = db.query(ip, Columns::all())? {
     ///     // This address has a matching record, but all columns are set to `-`.
-    ///     assert_eq!(row.proxy_type, Some(BString::from("-")));
-    ///     assert_eq!(row.country_short, Some(BString::from("-")));
-    ///     assert_eq!(row.country_long, Some(BString::from("-")));
+    ///     assert_eq!(row.proxy_type, Some(String::from("-")));
+    ///     assert_eq!(row.country_short, Some(String::from("-")));
+    ///     assert_eq!(row.country_long, Some(String::from("-")));
     /// } else {
     ///     unreachable!("Sample database is known to contain this ip");
     /// }
@@ -376,11 +374,11 @@ impl<R: ReadAt> Database<R> {
 
                 if below {
                     high_row = mid_row.checked_sub(1).ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::InvalidData, "underflow in binary search")
+                        io::Error::new(ErrorKind::InvalidData, "underflow in binary search")
                     })?;
                 } else if above {
                     low_row = mid_row.checked_add(1).ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::InvalidData, "overflow in binary search")
+                        io::Error::new(ErrorKind::InvalidData, "overflow in binary search")
                     })?;
                 } else {
                     return Ok(Some(self.read_row(&buf[addr_size..row_size], query)?));
@@ -413,7 +411,7 @@ impl<R: ReadAt> Database<R> {
         })
     }
 
-    fn read_country_col<S: Read>(&self, mut reader: S, query: Columns) -> io::Result<(Option<BString>, Option<BString>)> {
+    fn read_country_col<S: Read>(&self, mut reader: S, query: Columns) -> io::Result<(Option<String>, Option<String>)> {
         if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
             let country_short = match query.contains(Columns::COUNTRY_SHORT) {
@@ -430,7 +428,7 @@ impl<R: ReadAt> Database<R> {
         }
     }
 
-    fn read_col<S: Read>(&self, mut reader: S, query: Columns, column: Columns) -> io::Result<Option<BString>> {
+    fn read_col<S: Read>(&self, mut reader: S, query: Columns, column: Columns) -> io::Result<Option<String>> {
         if self.columns.contains(column) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
             if query.contains(column) {
@@ -440,14 +438,14 @@ impl<R: ReadAt> Database<R> {
         Ok(None)
     }
 
-    fn read_str(&self, ptr: u64) -> io::Result<BString> {
+    fn read_str(&self, ptr: u64) -> io::Result<String> {
         // +-----+-------+-------+-----+
         // | len | buf 0 | buf 1 | ... |
         // +-----+-------+-------+-----+
         let len = self.raf.read_u8_at(ptr)?;
         let mut buf = vec![0; usize::from(len)];
         self.raf.read_exact_at(ptr + 1, &mut buf)?; // ptr <= u32::MAX + 3
-        Ok(buf.into())
+        String::from_utf8(buf).map_err(|_| io::Error::new(ErrorKind::InvalidData, "invalid utf-8 data"))
     }
 }
 
