@@ -19,6 +19,7 @@ use ip2proxy::{Columns, Database};
 let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
 
 let ip = "1.0.0.1".parse()?;
+
 if let Some(row) = db.query(ip, Columns::all())? {
     // Record found.
     assert_eq!(row.proxy_type, Some(String::from("DCH")));
@@ -39,6 +40,7 @@ if let Some(row) = db.query(ip, Columns::all())? {
 }
 
 let ip = "2001:0db8:85a3:0000:0000:8a2e:0370:7334".parse()?;
+
 if let Some(row) = db.query(ip, Columns::all())? {
     // This address has a matching record, but all columns are set to `-`.
     assert_eq!(row.proxy_type, Some(String::from("-")));
