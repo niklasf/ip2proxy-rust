@@ -13,6 +13,7 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+#![warn(missing_debug_implementations)]
 
 use std::path::Path;
 use std::io;
@@ -90,12 +91,12 @@ pub struct Row {
     ///
     /// | Proxy type | Description |
     /// | --- | --- |
-    /// | VPN | Known VPN |
-    /// | TOR | Tor exit node |
-    /// | DCH | Hosting provider, data center, CDN |
-    /// | PUB | Public proxy |
-    /// | WEB | Web based proxy |
-    /// | SES | Search engine spider |
+    /// | `VPN` | Known VPN |
+    /// | `TOR` | Tor exit node |
+    /// | `DCH` | Hosting provider, data center, CDN |
+    /// | `PUB` | Public proxy |
+    /// | `WEB` | Web based proxy |
+    /// | `SES` | Search engine spider |
     pub proxy_type: Option<String>,
 
     /// ISO 3166 country code.
@@ -120,18 +121,18 @@ pub struct Row {
     ///
     /// | Usage type | Description |
     /// | --- | --- |
-    /// | COM | Commercial |
-    /// | ORG | Organization |
-    /// | GOV | Government |
-    /// | MIL | Military |
-    /// | EDU | University, college, school |
-    /// | LIB | Library |
-    /// | CDN | Content Delivery Network |
-    /// | ISP | Fixed Line ISP |
-    /// | MOB | Mobile ISP |
-    /// | DCH | Data center, hosting provider, transit |
-    /// | SES | Search engine spider |
-    /// | RSV | Reserved |
+    /// | `COM` | Commercial |
+    /// | `ORG` | Organization |
+    /// | `GOV` | Government |
+    /// | `MIL` | Military |
+    /// | `EDU` | University, college, school |
+    /// | `LIB` | Library |
+    /// | `CDN` | Content Delivery Network |
+    /// | `ISP` | Fixed Line ISP |
+    /// | `MOB` | Mobile ISP |
+    /// | `DCH` | Data center, hosting provider, transit |
+    /// | `SES` | Search engine spider |
+    /// | `RSV` | Reserved |
     pub usage_type: Option<String>,
 
     /// Autonomous System Number (ASN).
@@ -159,6 +160,7 @@ const PX: [Columns; 9] = [
 ];
 
 /// An ip2proxy database.
+#[derive(Debug)]
 pub struct Database<R> {
     raf: R,
     header: Header,
@@ -479,6 +481,7 @@ const HEADER_LEN: usize = 5 * 1 + 6 * 4;
 ///
 /// See [`Database::header()`](struct.Database.html#method.header) for a usage
 /// example.
+#[derive(Debug, Clone)]
 pub struct Header {
     px: u8,
     num_columns: u8,
@@ -560,6 +563,7 @@ struct RowRange {
     high_row: u32,
 }
 
+#[derive(Debug)]
 struct Index {
     table: Vec<RowRange>,
 }
