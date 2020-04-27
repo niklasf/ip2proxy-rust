@@ -306,6 +306,10 @@ impl Header {
         })
     }
 
+    pub fn px(&self) -> u8 {
+        self.px
+    }
+
     pub fn year(&self) -> u8 {
         self.year
     }

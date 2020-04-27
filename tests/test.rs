@@ -5,6 +5,12 @@ use bstr::BString;
 #[test]
 fn test_ipv4() {
     let database = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN").unwrap();
+    assert_eq!(database.header().px(), 4);
+    assert_eq!(database.header().year(), 16);
+    assert_eq!(database.header().month(), 11);
+    assert_eq!(database.header().day(), 17);
+    assert_eq!(database.header().rows_ipv4(), 150);
+    assert_eq!(database.header().rows_ipv6(), 4);
 
     let ip = "1.0.0.1".parse().unwrap();
     let row = dbg!(database.query(ip, Columns::all()).unwrap().unwrap());
