@@ -25,26 +25,57 @@ use byteorder::{LE, ReadBytesExt as _, ByteOrder as _};
 use positioned_io::{Cursor, RandomAccessFile, ReadAt, ReadBytesAtExt as _};
 
 bitflags! {
+    /// Set of supported or selected columns.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ip2proxy::Columns;
+    ///
+    /// assert_eq!(Columns::PX2, Columns::PROXY_TYPE | Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG);
+    /// ```
     pub struct Columns: u32 {
+        /// See [`Row::proxy_type`](struct.Row.html#structfield.proxy_type).
         const PROXY_TYPE    = 1 <<  0;
+        /// See [`Row::country_short`](struct.Row.html#structfield.country_short).
         const COUNTRY_SHORT = 1 <<  1;
+        /// See [`Row::country_long`](struct.Row.html#structfield.country_long).
         const COUNTRY_LONG  = 1 <<  2;
+        /// See [`Row::region`](struct.Row.html#structfield.region).
         const REGION        = 1 <<  3;
+        /// See [`Row::city`](struct.Row.html#structfield.city).
         const CITY          = 1 <<  4;
+        /// See [`Row::isp`](struct.Row.html#structfield.isp).
         const ISP           = 1 <<  5;
+        /// See [`Row::domain`](struct.Row.html#structfield.domain).
         const DOMAIN        = 1 <<  6;
+        /// See [`Row::usage_type`](struct.Row.html#structfield.usage_type).
         const USAGE_TYPE    = 1 <<  7;
+        /// See [`Row::asn`](struct.Row.html#structfield.asn).
         const ASN           = 1 <<  8;
+        /// See [`Row::as_name`](struct.Row.html#structfield.as_name).
         const AS_NAME       = 1 <<  9;
+        /// See [`Row::last_seen`](struct.Row.html#structfield.last_seen).
         const LAST_SEEN     = 1 << 10;
 
+        /// Alias for columns of PX1: IP-Country Database.
         const PX1 = Columns::COUNTRY_SHORT.bits | Columns::COUNTRY_LONG.bits;
+        /// Alias for columns of PX2: IP-ProxyType-Country Database.
         const PX2 = Columns::PROXY_TYPE.bits | Columns::PX1.bits;
+        /// Alias for columns of PX3: IP-ProxyType-Country-Region-City Database.
         const PX3 = Columns::PX2.bits | Columns::REGION.bits | Columns::CITY.bits;
+        /// Alias for columns of PX4: IP-ProxyType-Country-Region-City-ISP Database.
         const PX4 = Columns::PX3.bits | Columns::ISP.bits;
+        /// Alias for columns of PX5: IP-ProxyType-Country-Region-City-ISP-Domain Database.
         const PX5 = Columns::PX4.bits | Columns::DOMAIN.bits;
+        /// Alias for columns of PX6: IP-ProxyType-Country-Region-City-ISP-Domain-UsageType
+        /// Database.
         const PX6 = Columns::PX5.bits | Columns::USAGE_TYPE.bits;
+        /// Alias for columns of PX7: IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN
+        /// Database.
         const PX7 = Columns::PX6.bits | Columns::ASN.bits | Columns::AS_NAME.bits;
+        /// Alias for columns of PX8:
+        /// IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN-LastSeen Database.
         const PX8 = Columns::PX7.bits | Columns::LAST_SEEN.bits;
     }
 }
