@@ -12,6 +12,7 @@
 // - CI
 
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 use std::path::Path;
 use std::io;
@@ -133,7 +134,7 @@ impl<R> Database<R> {
     /// assert_eq!(header.day(), 17); // 17th
     /// assert_eq!(header.rows_ipv4(), 150);
     /// assert_eq!(header.rows_ipv6(), 4);
-    /// # Ok::<_, Box<std::error::Error>>(())
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn header(&self) -> &Header {
         &self.header
@@ -148,7 +149,7 @@ impl<R> Database<R> {
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
     /// assert!(db.columns().contains(Columns::PROXY_TYPE));
-    /// # Ok::<_, Box<std::error::Error>>(())
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn columns(&self) -> Columns {
         self.columns
@@ -171,7 +172,7 @@ impl Database<RandomAccessFile> {
     /// use ip2proxy::Database;
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// # Ok::<_, Box<std::error::Error>>(())
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     ///
     /// # Errors
@@ -202,7 +203,7 @@ impl<R: ReadAt> Database<R> {
     /// file.read_to_end(&mut source);
     ///
     /// let db = Database::new(file)?;
-    /// # Ok::<_, Box<std::error::Error>>(())
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     ///
     /// # Errors
@@ -234,7 +235,9 @@ impl<R: ReadAt> Database<R> {
         })
     }
 
-    /// Look information for an IP address.
+    /// Look up information for an IP address.
+    ///
+    /// # Example
     ///
     /// ```
     /// use bstr::BString;
@@ -243,23 +246,41 @@ impl<R: ReadAt> Database<R> {
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
     ///
     /// let ip = "1.0.0.1".parse()?;
-    /// let row = db.query(ip, Columns::all())?.expect("row exists");
+    /// if let Some(row) = db.query(ip, Columns::all())? {
+    ///     // Record found.
+    ///     assert_eq!(row.proxy_type, Some(BString::from("DCH")));
+    ///     assert_eq!(row.country_short, Some(BString::from("AU")));
+    ///     assert_eq!(row.country_long, Some(BString::from("Australia")));
+    ///     assert_eq!(row.region, Some(BString::from("Queensland")));
+    ///     assert_eq!(row.city, Some(BString::from("Brisbane")));
+    ///     assert_eq!(row.isp, Some(BString::from("Research Prefix for APNIC Labs")));
     ///
-    /// assert_eq!(row.proxy_type, Some(BString::from("DCH")));
-    /// assert_eq!(row.country_short, Some(BString::from("AU")));
-    /// assert_eq!(row.country_long, Some(BString::from("Australia")));
-    /// assert_eq!(row.region, Some(BString::from("Queensland")));
-    /// assert_eq!(row.city, Some(BString::from("Brisbane")));
-    /// assert_eq!(row.isp, Some(BString::from("Research Prefix for APNIC Labs")));
+    ///     // The sample database does not have the following columns.
+    ///     assert!(row.domain.is_none());
+    ///     assert!(row.usage_type.is_none());
+    ///     assert!(row.asn.is_none());
+    ///     assert!(row.as_name.is_none());
+    ///     assert!(row.last_seen.is_none());
+    /// } else {
+    ///     unreachable!("Sample database is known to contain this ip");
+    /// }
     ///
-    /// // The sample database does not have the following columns.
-    /// assert!(row.domain.is_none());
-    /// assert!(row.usage_type.is_none());
-    /// assert!(row.asn.is_none());
-    /// assert!(row.as_name.is_none());
-    /// assert!(row.last_seen.is_none());
-    /// # Ok::<_, Box<std::error::Error>>(())
+    /// let ip = "2001:0db8:85a3:0000:0000:8a2e:0370:7334".parse()?;
+    /// if let Some(row) = db.query(ip, Columns::all())? {
+    ///     // This address has a matching record, but all columns are set to `-`.
+    ///     assert_eq!(row.proxy_type, Some(BString::from("-")));
+    ///     assert_eq!(row.country_short, Some(BString::from("-")));
+    ///     assert_eq!(row.country_long, Some(BString::from("-")));
+    /// } else {
+    ///     unreachable!("Sample database is known to contain this ip");
+    /// }
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// * Error while reading from the source.
+    /// * Invalid record or data in string section.
     pub fn query(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
         let addr = normalize_ip(addr);
 
@@ -402,6 +423,9 @@ fn mid(low_row: u32, high_row: u32) -> u32 {
 
 const HEADER_LEN: usize = 5 * 1 + 6 * 4;
 
+/// A database header with meta information. See
+/// [`Database::header()`](struct.Database.html#method.header) for a usage
+/// example.
 pub struct Header {
     px: u8,
     num_columns: u8,
@@ -443,26 +467,35 @@ impl Header {
         })
     }
 
+    /// Get database format. Supported databases are PX1 to PX8.
     pub fn px(&self) -> u8 {
         self.px
     }
 
+    /// Get the database creation year. Convention is `16` for `2016`.
     pub fn year(&self) -> u8 {
         self.year
     }
 
+    /// Get the database creation month. Convention is `1` for January.
     pub fn month(&self) -> u8 {
         self.month
     }
 
+    /// Get the database creation day. Convention is `1` for the first day
+    /// of the month.
     pub fn day(&self) -> u8 {
         self.day
     }
 
+    /// Get the number of rows for IPv4 addresses. Rows can cover a range,
+    /// so there may be information for many more IP addresses.
     pub fn rows_ipv4(&self) -> u32 {
         self.rows_v4
     }
 
+    /// Get the number of rows for IPv6 addresses. Rows can cover a range,
+    /// so there may be information for many more IP addresses.
     pub fn rows_ipv6(&self) -> u32 {
         self.rows_v6
     }
