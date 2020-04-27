@@ -81,19 +81,69 @@ bitflags! {
     }
 }
 
+/// Database record for an IP address.
+///
+/// Use [`Database::query()`](struct.Database.html#method.query) to obtain this
+/// from a database.
 #[derive(Debug, Clone)]
 pub struct Row {
+    /// Type of proxy, if any.
+    ///
+    /// | Proxy type | Description |
+    /// | --- | --- |
+    /// | VPN | Known VPN |
+    /// | TOR | Tor exit node |
+    /// | DCH | Hosting provider, data center, CDN |
+    /// | PUB | Public proxy |
+    /// | WEB | Web based proxy |
+    /// | SES | Search engine spider |
     pub proxy_type: Option<BString>,
+
+    /// ISO 3166 country code.
     pub country_short: Option<BString>,
+
+    /// ISO 3166 country name.
     pub country_long: Option<BString>,
+
+    /// Region or state name.
     pub region: Option<BString>,
+
+    /// City name.
     pub city: Option<BString>,
+
+    /// Internet service provider or company name.
     pub isp: Option<BString>,
+
+    /// Domain associated with the IP address, if any.
     pub domain: Option<BString>,
+
+    /// Usage type classification.
+    ///
+    /// | Usage type | Description |
+    /// | --- | --- |
+    /// | COM | Commercial |
+    /// | ORG | Organization |
+    /// | GOV | Government |
+    /// | MIL | Military |
+    /// | EDU | University, college, school |
+    /// | LIB | Library |
+    /// | CDN | Content Delivery Network |
+    /// | ISP | Fixed Line ISP |
+    /// | MOB | Mobile ISP |
+    /// | DCH | Data center, hosting provider, transit |
+    /// | SES | Search engine spider |
+    /// | RSV | Reserved |
     pub usage_type: Option<BString>,
+
+    /// Autonomous System Number (ASN).
     pub asn: Option<BString>,
+
+    /// Autonomous System (AS) name.
     pub as_name: Option<BString>,
+
+    /// Number of days since the proxy was last seen.
     pub last_seen: Option<BString>,
+
     _priv: (),
 }
 
@@ -186,9 +236,10 @@ impl Database<RandomAccessFile> {
 
 impl<R: ReadAt> Database<R> {
     /// Open a database from a source that supports
-    /// [`ReatAt`](../positioned_io_preview/trait.ReadAt.html). Use
-    /// [`Database::open()`](struct.Database.html#method.open) if the source
-    /// if a file.
+    /// [`ReatAt`](../positioned_io_preview/trait.ReadAt.html).
+    ///
+    /// Use [`Database::open()`](struct.Database.html#method.open) if the
+    /// source is a file.
     ///
     /// # Example
     ///
@@ -236,6 +287,9 @@ impl<R: ReadAt> Database<R> {
     }
 
     /// Look up information for an IP address.
+    ///
+    /// The [`Columns`](struct.Columns.html) parameter allows optimizing the
+    /// lookup by limiting the number columns to retrieve.
     ///
     /// # Example
     ///
@@ -423,8 +477,9 @@ fn mid(low_row: u32, high_row: u32) -> u32 {
 
 const HEADER_LEN: usize = 5 * 1 + 6 * 4;
 
-/// A database header with meta information. See
-/// [`Database::header()`](struct.Database.html#method.header) for a usage
+/// A database header with meta information.
+///
+/// See [`Database::header()`](struct.Database.html#method.header) for a usage
 /// example.
 pub struct Header {
     px: u8,
