@@ -1,5 +1,4 @@
 // TODO:
-// - Test v4
 // - Test v6
 // - Clippy
 // - Documentation
@@ -23,7 +22,7 @@ use std::cmp::min;
 use bitflags::bitflags;
 use bstr::BString;
 use byteorder::{LE, ReadBytesExt as _, ByteOrder as _};
-use positioned_io::{Cursor, RandomAccessFile, ReadBytesAtExt as _, ReadAt as _};
+use positioned_io::{Cursor, RandomAccessFile, ReadAt, ReadBytesAtExt as _};
 
 bitflags! {
     pub struct Columns: u32 {
@@ -63,6 +62,7 @@ pub struct Row {
     pub asn: Option<BString>,
     pub as_name: Option<BString>,
     pub last_seen: Option<BString>,
+    _priv: (),
 }
 
 const PX: [Columns; 9] = [
@@ -77,18 +77,39 @@ const PX: [Columns; 9] = [
     Columns::PX8,
 ];
 
-pub struct Database {
-    raf: RandomAccessFile,
+pub struct Database<R> {
+    raf: R,
     header: Header,
     index_v4: Option<Index>,
     index_v6: Option<Index>,
     columns: Columns,
 }
 
-impl Database {
-    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Database> {
-        let raf = RandomAccessFile::open(path)?;
+impl<R> Database<R> {
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
 
+    pub fn columns(&self) -> Columns {
+        self.columns
+    }
+
+    fn query_index(&self, addr: IpAddr) -> Option<RowRange> {
+        match addr {
+            IpAddr::V4(addr) => self.index_v4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
+            IpAddr::V6(addr) => self.index_v6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
+        }
+    }
+}
+
+impl Database<RandomAccessFile> {
+    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        Self::new(RandomAccessFile::open(path)?)
+    }
+}
+
+impl<R: ReadAt> Database<R> {
+    pub fn new(raf: R) -> io::Result<Self> {
         let mut header_buf = [0; HEADER_LEN];
         raf.read_exact_at(0, &mut header_buf)?;
         let header = Header::read(&header_buf[..])?;
@@ -111,10 +132,6 @@ impl Database {
             raf,
             header,
         })
-    }
-
-    pub fn header(&self) -> &Header {
-        &self.header
     }
 
     pub fn query(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
@@ -173,13 +190,6 @@ impl Database {
         Ok(None)
     }
 
-    fn query_index(&self, addr: IpAddr) -> Option<RowRange> {
-        match addr {
-            IpAddr::V4(addr) => self.index_v4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
-            IpAddr::V6(addr) => self.index_v6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
-        }
-    }
-
     fn read_row(&self, buf: &[u8], query: Columns) -> io::Result<Row> {
         let mut cursor = io::Cursor::new(buf);
 
@@ -198,10 +208,11 @@ impl Database {
             asn: self.read_col(&mut cursor, query, Columns::ASN)?,
             as_name: self.read_col(&mut cursor, query, Columns::AS_NAME)?,
             last_seen: self.read_col(&mut cursor, query, Columns::LAST_SEEN)?,
+            _priv: (),
         })
     }
 
-    fn read_country_col<R: Read>(&self, mut reader: R, query: Columns) -> io::Result<(Option<BString>, Option<BString>)> {
+    fn read_country_col<S: Read>(&self, mut reader: S, query: Columns) -> io::Result<(Option<BString>, Option<BString>)> {
         if self.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
             let country_short = match query.contains(Columns::COUNTRY_SHORT) {
@@ -218,7 +229,7 @@ impl Database {
         }
     }
 
-    fn read_col<R: Read>(&self, mut reader: R, query: Columns, column: Columns) -> io::Result<Option<BString>> {
+    fn read_col<S: Read>(&self, mut reader: S, query: Columns, column: Columns) -> io::Result<Option<BString>> {
         if self.columns.contains(column) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
             if query.contains(column) {

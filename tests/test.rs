@@ -1,4 +1,3 @@
-use std::io;
 use ip2proxy::{Database, Columns};
 use bstr::BString;
 
