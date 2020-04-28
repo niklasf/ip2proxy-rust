@@ -200,7 +200,7 @@ impl Row {
     }
 }
 
-/// An ip2proxy database.
+/// An IP2Proxy BIN database.
 #[derive(Debug)]
 pub struct Database {
     raf: RandomAccessFile,
@@ -439,7 +439,9 @@ fn normalize_ip(addr: IpAddr) -> IpAddr {
     match addr {
         IpAddr::V4(_) => addr,
         IpAddr::V6(addr) => {
-            if Ipv6Addr::from(FROM_6TO4) <= addr && addr <= Ipv6Addr::from(TO_6TO4) {
+            if let Some(addr) = addr.to_ipv4() {
+                IpAddr::V4(addr)
+            } else if Ipv6Addr::from(FROM_6TO4) <= addr && addr <= Ipv6Addr::from(TO_6TO4) {
                 IpAddr::V4(((u128::from(addr) >> 80) as u32).into())
             } else if Ipv6Addr::from(FROM_TEREDO) <= addr && addr <= Ipv6Addr::from(TO_TEREDO) {
                 IpAddr::V4((!u128::from(addr) as u32).into())
