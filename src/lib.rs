@@ -1,6 +1,3 @@
-// TODO:
-// - Test v6
-
 //! Library to query **IP2Proxy BIN Data** files. They contain known proxies,
 //! geolocation information, and other meta data for IP address ranges.
 //!
