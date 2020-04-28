@@ -43,5 +43,5 @@ License
 -------
 
 This is an independently developed open-source library, licensed under the
-MIT or Apache-2.0 license at your option. The author is not associated with
+MIT or Apache 2.0 license at your option. The author is not associated with
 *IP2Location.com*.
