@@ -1,6 +1,5 @@
 // TODO:
 // - Test v6
-// - Test 6to4
 
 //! Library to query **IP2Proxy BIN Data** files. They contain known proxies,
 //! geolocation information, and other meta data for IP address ranges.
@@ -596,6 +595,13 @@ mod tests {
     fn test_teredo() {
         let ipv6 = "2001:0:4136:e378:8000:63bf:3fff:fdd2".parse().unwrap();
         let ipv4: IpAddr = "192.0.2.45".parse().unwrap();
+        assert_eq!(normalize_ip(ipv6), ipv4);
+    }
+
+    #[test]
+    fn test_6to4() {
+        let ipv6 = "2002:A0B:1621::".parse().unwrap();
+        let ipv4: IpAddr = "10.11.22.33".parse().unwrap();
         assert_eq!(normalize_ip(ipv6), ipv4);
     }
 }
