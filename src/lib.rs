@@ -565,7 +565,7 @@ const PX: [Columns; 9] = [
 
 fn validate_columns(num_columns: u8) -> io::Result<u8> {
     if num_columns < 1 || MAX_COLUMNS < usize::from(num_columns) {
-        Err(io::Error::new(io::ErrorKind::InvalidData, "invalid number of columns"))
+        Err(io::Error::new(ErrorKind::InvalidData, "invalid number of columns"))
     } else {
         Ok(num_columns)
     }
