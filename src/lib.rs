@@ -185,11 +185,7 @@ impl Row {
             }
         }
         if let Some(ref proxy_type) = self.proxy_type {
-            if proxy_type == "-" {
-                return Some(false);
-            } else {
-                return Some(true);
-            }
+            return Some(proxy_type != "-");
         }
         None
     }
