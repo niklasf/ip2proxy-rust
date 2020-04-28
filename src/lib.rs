@@ -113,7 +113,7 @@ bitflags! {
 /// from a database.
 ///
 /// By convention, `-` is used for fields where the column is supported but
-/// the row does not have a value.
+/// the cell does not have a value.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
 pub struct Row {
     /// Type of proxy, if any.
@@ -196,8 +196,8 @@ impl Row {
 pub struct Database {
     raf: RandomAccessFile,
     header: Header,
-    index_v4: Option<Index>,
-    index_v6: Option<Index>,
+    index_v4: Option<IndexTable>,
+    index_v6: Option<IndexTable>,
 }
 
 impl Database {
@@ -219,6 +219,27 @@ impl Database {
     /// * Invalid data in header section or index section.
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         Self::new(RandomAccessFile::open(path)?)
+    }
+
+    fn new(raf: RandomAccessFile) -> io::Result<Self> {
+        let mut header_buf = [0; HEADER_LEN];
+        raf.read_exact_at(0, &mut header_buf)?;
+        let header = Header::read(&header_buf[..])?;
+
+        Ok(Database {
+            index_v4: if header.index_ptr_v4 != 0 {
+                Some(IndexTable::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?)
+            } else {
+                None
+            },
+            index_v6: if header.index_ptr_v6 != 0 {
+                Some(IndexTable::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?)
+            } else {
+                None
+            },
+            header,
+            raf,
+        })
     }
 
     /// Look up information for an IP address.
@@ -331,31 +352,6 @@ impl Database {
         })
     }
 
-    fn new(raf: RandomAccessFile) -> io::Result<Self> {
-        let mut header_buf = [0; HEADER_LEN];
-        raf.read_exact_at(0, &mut header_buf)?;
-        let header = Header::read(&header_buf[..])?;
-        if header.columns.is_empty() {
-            return Err(io::Error::new(ErrorKind::InvalidData, "only px1 - px8 supported"));
-        }
-
-        Ok(Database {
-            index_v4: if header.index_ptr_v4 != 0 {
-                Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?)
-            } else {
-                None
-            },
-            index_v6: if header.index_ptr_v6 != 0 {
-                Some(Index::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?)
-            } else {
-                None
-            },
-            header,
-            raf,
-        })
-    }
-
-
     fn read_country_col<R: Read>(&self, mut reader: R, query: Columns) -> io::Result<(Option<String>, Option<String>)> {
         if self.header.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
@@ -396,6 +392,7 @@ impl Database {
     }
 
     fn query_index(&self, addr: IpAddr) -> Option<RowRange> {
+        // Index has a row range for each possibe value of the upper 16 bits.
         match addr {
             IpAddr::V4(addr) => self.index_v4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
             IpAddr::V6(addr) => self.index_v6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
@@ -448,30 +445,6 @@ fn mid(low_row: u32, high_row: u32) -> u32 {
     ((u64::from(low_row) + u64::from(high_row)) / 2) as u32
 }
 
-const HEADER_LEN: usize = 5 + 6 * 4;
-
-const MAX_COLUMNS: usize = 11;
-
-const PX: [Columns; 9] = [
-    Columns::empty(),
-    Columns::PX1,
-    Columns::PX2,
-    Columns::PX3,
-    Columns::PX4,
-    Columns::PX5,
-    Columns::PX6,
-    Columns::PX7,
-    Columns::PX8,
-];
-
-fn validate_columns(num_columns: u8) -> io::Result<u8> {
-    if num_columns < 1 || MAX_COLUMNS < usize::from(num_columns) {
-        Err(io::Error::new(io::ErrorKind::InvalidData, "invalid number of columns"))
-    } else {
-        Ok(num_columns)
-    }
-}
-
 /// A database header with meta information.
 ///
 /// See [`Database::header()`](struct.Database.html#method.header) for a usage
@@ -495,9 +468,14 @@ pub struct Header {
 impl Header {
     fn read<R: Read>(mut reader: R) -> io::Result<Header> {
         let px = reader.read_u8()?;
+        let columns = PX.get(usize::from(px)).copied().unwrap_or_else(Columns::empty);
+        if columns.is_empty() {
+            return Err(io::Error::new(ErrorKind::InvalidData, "only px1 - px8 supported"));
+        }
+
         Ok(Header {
             px,
-            columns: PX.get(usize::from(px)).copied().unwrap_or_else(Columns::empty),
+            columns,
             num_columns: validate_columns(reader.read_u8()?)?,
             year: reader.read_u8()?,
             month: reader.read_u8()?,
@@ -560,6 +538,30 @@ impl Header {
     }
 }
 
+const HEADER_LEN: usize = 5 + 6 * 4;
+
+const MAX_COLUMNS: usize = 11;
+
+const PX: [Columns; 9] = [
+    Columns::empty(),
+    Columns::PX1,
+    Columns::PX2,
+    Columns::PX3,
+    Columns::PX4,
+    Columns::PX5,
+    Columns::PX6,
+    Columns::PX7,
+    Columns::PX8,
+];
+
+fn validate_columns(num_columns: u8) -> io::Result<u8> {
+    if num_columns < 1 || MAX_COLUMNS < usize::from(num_columns) {
+        Err(io::Error::new(io::ErrorKind::InvalidData, "invalid number of columns"))
+    } else {
+        Ok(num_columns)
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 struct RowRange {
     low_row: u32,
@@ -567,12 +569,12 @@ struct RowRange {
 }
 
 #[derive(Debug)]
-struct Index {
+struct IndexTable {
     table: Vec<RowRange>,
 }
 
-impl Index {
-    fn read<R: Read>(mut reader: R) -> io::Result<Index> {
+impl IndexTable {
+    fn read<R: Read>(mut reader: R) -> io::Result<IndexTable> {
         let mut table = Vec::with_capacity(1 << 16);
         while table.len() < (1 << 16) {
             table.push(RowRange {
@@ -580,6 +582,6 @@ impl Index {
                 high_row: reader.read_u32::<LE>()?,
             })
         }
-        Ok(Index { table })
+        Ok(IndexTable { table })
     }
 }
