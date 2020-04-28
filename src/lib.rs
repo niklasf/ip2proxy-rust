@@ -2,8 +2,6 @@
 // - Test v6
 // - Test 6to4
 // - Test teredo
-// - Serde for row
-// - Fuzzing
 
 //! Library to query **IP2Proxy BIN Data** files. They contain known proxies,
 //! geolocation information, and other meta data for IP address ranges.
@@ -33,6 +31,10 @@
 //! }));
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! # Cargo features
+//!
+//! * `serde`: Implement `serde::Serialize` and `serde::Deserialize` for `Row`.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -115,6 +117,7 @@ bitflags! {
 /// By convention, `-` is used for fields where the column is supported but
 /// the cell does not have a value.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Row {
     /// Type of proxy, if any.
     ///
