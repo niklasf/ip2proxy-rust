@@ -127,26 +127,33 @@ pub struct Row {
     /// | `PUB` | Public proxy |
     /// | `WEB` | Web based proxy |
     /// | `SES` | Search engine spider |
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub proxy_type: Option<String>,
 
     /// ISO 3166 country code like `US`.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub country_short: Option<String>,
 
     /// ISO 3166 country name like `United States of America`.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub country_long: Option<String>,
 
     /// Region or state name like `California`.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub region: Option<String>,
 
     /// City name like `Los Angeles`.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub city: Option<String>,
 
     /// Internet service provider or company name, like
     /// `APNIC and CloudFlare DNS Resolver Project`.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub isp: Option<String>,
 
     /// Domain name associated with the IP address, if any,
     /// like `cloudflare.com`.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub domain: Option<String>,
 
     /// Usage type classification.
@@ -165,15 +172,19 @@ pub struct Row {
     /// | `DCH` | Data center, hosting provider, transit |
     /// | `SES` | Search engine spider |
     /// | `RSV` | Reserved |
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub usage_type: Option<String>,
 
     /// Autonomous System Number (ASN), like `13335`.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub asn: Option<String>,
 
     /// Autonomous System (AS) name, like `CLOUDFLARENET`.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub as_name: Option<String>,
 
     /// Number of days since the proxy was last seen.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub last_seen: Option<String>,
 }
 
