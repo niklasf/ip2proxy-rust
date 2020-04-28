@@ -1,7 +1,6 @@
 // TODO:
 // - Test v6
 // - Test 6to4
-// - Test teredo
 
 //! Library to query **IP2Proxy BIN Data** files. They contain known proxies,
 //! geolocation information, and other meta data for IP address ranges.
@@ -586,5 +585,17 @@ impl IndexTable {
             })
         }
         Ok(IndexTable { table })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_teredo() {
+        let ipv6 = "2001:0:4136:e378:8000:63bf:3fff:fdd2".parse().unwrap();
+        let ipv4: IpAddr = "192.0.2.45".parse().unwrap();
+        assert_eq!(normalize_ip(ipv6), ipv4);
     }
 }
