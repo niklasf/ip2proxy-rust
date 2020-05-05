@@ -207,8 +207,8 @@ impl Row {
 pub struct Database {
     raf: RandomAccessFile,
     header: Header,
-    index_v4: Option<IndexTable>,
-    index_v6: Option<IndexTable>,
+    index_ipv4: Option<IndexTable>,
+    index_ipv6: Option<IndexTable>,
 }
 
 impl Database {
@@ -238,13 +238,13 @@ impl Database {
         let header = Header::read(&header_buf[..])?;
 
         Ok(Database {
-            index_v4: if header.index_ptr_v4 != 0 {
-                Some(IndexTable::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v4) - 1))?)
+            index_ipv4: if header.index_ptr_ipv4 != 0 {
+                Some(IndexTable::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_ipv4) - 1))?)
             } else {
                 None
             },
-            index_v6: if header.index_ptr_v6 != 0 {
-                Some(IndexTable::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_v6) - 1))?)
+            index_ipv6: if header.index_ptr_ipv6 != 0 {
+                Some(IndexTable::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_ipv6) - 1))?)
             } else {
                 None
             },
@@ -290,9 +290,9 @@ impl Database {
 
         if let Some(RowRange { mut low_row, mut high_row }) = self.query_index(addr) {
             let (base_ptr, addr_size) = if addr.is_ipv4() {
-                (self.header.base_ptr_v4, 4)
+                (self.header.base_ptr_ipv4, 4)
             } else {
-                (self.header.base_ptr_v6, 16)
+                (self.header.base_ptr_ipv6, 16)
             };
 
             if base_ptr == 0 {
@@ -405,8 +405,8 @@ impl Database {
     fn query_index(&self, addr: IpAddr) -> Option<RowRange> {
         // Index has a row range for each possibe value of the upper 16 bits.
         match addr {
-            IpAddr::V4(addr) => self.index_v4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
-            IpAddr::V6(addr) => self.index_v6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
+            IpAddr::V4(addr) => self.index_ipv4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
+            IpAddr::V6(addr) => self.index_ipv6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
         }
     }
 
@@ -469,12 +469,12 @@ pub struct Header {
     year: u8,
     month: u8,
     day: u8,
-    rows_v4: u32,
-    base_ptr_v4: u32,
-    rows_v6: u32,
-    base_ptr_v6: u32,
-    index_ptr_v4: u32,
-    index_ptr_v6: u32,
+    rows_ipv4: u32,
+    base_ptr_ipv4: u32,
+    rows_ipv6: u32,
+    base_ptr_ipv6: u32,
+    index_ptr_ipv4: u32,
+    index_ptr_ipv6: u32,
     columns: Columns,
 }
 
@@ -493,12 +493,12 @@ impl Header {
             year: reader.read_u8()?,
             month: reader.read_u8()?,
             day: reader.read_u8()?,
-            rows_v4: reader.read_u32::<LE>()?,
-            base_ptr_v4: reader.read_u32::<LE>()?,
-            rows_v6: reader.read_u32::<LE>()?,
-            base_ptr_v6: reader.read_u32::<LE>()?,
-            index_ptr_v4: reader.read_u32::<LE>()?,
-            index_ptr_v6: reader.read_u32::<LE>()?,
+            rows_ipv4: reader.read_u32::<LE>()?,
+            base_ptr_ipv4: reader.read_u32::<LE>()?,
+            rows_ipv6: reader.read_u32::<LE>()?,
+            base_ptr_ipv6: reader.read_u32::<LE>()?,
+            index_ptr_ipv4: reader.read_u32::<LE>()?,
+            index_ptr_ipv6: reader.read_u32::<LE>()?,
         })
     }
 
@@ -526,13 +526,13 @@ impl Header {
     /// Get the number of rows for IPv4 addresses. Rows can cover a range,
     /// so there may be information for many more IP addresses.
     pub fn rows_ipv4(&self) -> u32 {
-        self.rows_v4
+        self.rows_ipv4
     }
 
     /// Get the number of rows for IPv6 addresses. Rows can cover a range,
     /// so there may be information for many more IP addresses.
     pub fn rows_ipv6(&self) -> u32 {
-        self.rows_v6
+        self.rows_ipv6
     }
 
     /// Get the set of supported columns.
@@ -593,7 +593,7 @@ impl IndexTable {
             table.push(RowRange {
                 low_row: reader.read_u32::<LE>()?,
                 high_row: reader.read_u32::<LE>()?,
-            })
+            });
         }
         Ok(IndexTable { table })
     }
