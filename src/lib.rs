@@ -32,19 +32,20 @@
 //! * `serde`: Implement `serde::Serialize` and `serde::Deserialize` for `Row`.
 
 #![doc(html_root_url = "https://docs.rs/ip2proxy/1.0.1")]
-
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 
-use std::path::Path;
-use std::io;
-use std::io::{ErrorKind, Read};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::cmp::min;
+use std::{
+    cmp::min,
+    io,
+    io::{ErrorKind, Read},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    path::Path,
+};
 
 use bitflags::bitflags;
-use byteorder::{LE, ReadBytesExt as _, ByteOrder as _};
+use byteorder::{ByteOrder as _, ReadBytesExt as _, LE};
 use positioned_io::{Cursor, RandomAccessFile, ReadAt, ReadBytesAtExt as _};
 
 bitflags! {
@@ -140,33 +141,54 @@ pub struct Row {
     /// | `WEB` | Web based proxy |
     /// | `SES` | Search engine spider |
     /// | `RES` | Residential proxies. Only available with PX10 & PX11 |
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub proxy_type: Option<String>,
 
     /// ISO 3166 country code like `US`.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub country_short: Option<String>,
 
     /// ISO 3166 country name like `United States of America`.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub country_long: Option<String>,
 
     /// Region or state name like `California`.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub region: Option<String>,
 
     /// City name like `Los Angeles`.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub city: Option<String>,
 
     /// Internet service provider or company name, like
     /// `APNIC and CloudFlare DNS Resolver Project`.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub isp: Option<String>,
 
     /// Domain name associated with the IP address, if any,
     /// like `cloudflare.com`.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub domain: Option<String>,
 
     /// Usage type classification.
@@ -185,32 +207,50 @@ pub struct Row {
     /// | `DCH` | Data center, hosting provider, transit |
     /// | `SES` | Search engine spider |
     /// | `RSV` | Reserved |
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub usage_type: Option<String>,
 
     /// Autonomous System Number (ASN), like `13335`.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub asn: Option<String>,
 
     /// Autonomous System (AS) name, like `CLOUDFLARENET`.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub as_name: Option<String>,
 
     /// Number of days since the proxy was last seen.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub last_seen: Option<String>,
-    
+
     /// Security threat reported.
     /// | Threat type | Description |
     /// | --- | --- |
     /// | `SPAM` | Email and forum spammers |
     /// | `SCANNER` | Network security scanners |
     /// | `BOTNET` | Malware infected devices |
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub threat: Option<String>,
-    
+
     /// Name of VPN provider if available.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub provider: Option<String>,
 }
 
@@ -266,12 +306,18 @@ impl Database {
 
         Ok(Database {
             index_ipv4: if header.index_ptr_ipv4 != 0 {
-                Some(IndexTable::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_ipv4) - 1))?)
+                Some(IndexTable::read(Cursor::new_pos(
+                    &raf,
+                    u64::from(header.index_ptr_ipv4) - 1,
+                ))?)
             } else {
                 None
             },
             index_ipv6: if header.index_ptr_ipv6 != 0 {
-                Some(IndexTable::read(Cursor::new_pos(&raf, u64::from(header.index_ptr_ipv6) - 1))?)
+                Some(IndexTable::read(Cursor::new_pos(
+                    &raf,
+                    u64::from(header.index_ptr_ipv6) - 1,
+                ))?)
             } else {
                 None
             },
@@ -315,7 +361,11 @@ impl Database {
     pub fn query(&self, addr: IpAddr, query: Columns) -> io::Result<Option<Row>> {
         let addr = normalize_ip(addr);
 
-        if let Some(RowRange { mut low_row, mut high_row }) = self.query_index(addr) {
+        if let Some(RowRange {
+            mut low_row,
+            mut high_row,
+        }) = self.query_index(addr)
+        {
             let (base_ptr, addr_size) = if addr.is_ipv4() {
                 (self.header.base_ptr_ipv4, 4)
             } else {
@@ -392,8 +442,16 @@ impl Database {
         })
     }
 
-    fn read_country_col<R: Read>(&self, mut reader: R, query: Columns) -> io::Result<(Option<String>, Option<String>)> {
-        if self.header.columns.intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG) {
+    fn read_country_col<R: Read>(
+        &self,
+        mut reader: R,
+        query: Columns,
+    ) -> io::Result<(Option<String>, Option<String>)> {
+        if self
+            .header
+            .columns
+            .intersects(Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG)
+        {
             let ptr = u64::from(reader.read_u32::<LE>()?);
             let country_short = if query.contains(Columns::COUNTRY_SHORT) {
                 Some(self.read_str(ptr)?)
@@ -411,7 +469,12 @@ impl Database {
         }
     }
 
-    fn read_col<R: Read>(&self, mut reader: R, query: Columns, column: Columns) -> io::Result<Option<String>> {
+    fn read_col<R: Read>(
+        &self,
+        mut reader: R,
+        query: Columns,
+        column: Columns,
+    ) -> io::Result<Option<String>> {
         if self.header.columns.contains(column) {
             let ptr = u64::from(reader.read_u32::<LE>()?);
             if query.contains(column) {
@@ -428,14 +491,21 @@ impl Database {
         let len = self.raf.read_u8_at(ptr)?;
         let mut buf = vec![0; usize::from(len)];
         self.raf.read_exact_at(ptr + 1, &mut buf)?; // ptr <= u32::MAX + 3
-        String::from_utf8(buf).map_err(|_| io::Error::new(ErrorKind::InvalidData, "invalid utf-8 data"))
+        String::from_utf8(buf)
+            .map_err(|_| io::Error::new(ErrorKind::InvalidData, "invalid utf-8 data"))
     }
 
     fn query_index(&self, addr: IpAddr) -> Option<RowRange> {
         // Index has a row range for each possibe value of the upper 16 bits.
         match addr {
-            IpAddr::V4(addr) => self.index_ipv4.as_ref().map(|i| i.table[(u32::from(addr) >> 16) as usize]),
-            IpAddr::V6(addr) => self.index_ipv6.as_ref().map(|i| i.table[usize::from(addr.segments()[0])]),
+            IpAddr::V4(addr) => self
+                .index_ipv4
+                .as_ref()
+                .map(|i| i.table[(u32::from(addr) >> 16) as usize]),
+            IpAddr::V6(addr) => self
+                .index_ipv6
+                .as_ref()
+                .map(|i| i.table[usize::from(addr.segments()[0])]),
         }
     }
 
@@ -464,7 +534,11 @@ impl Database {
     /// let database_version = db.get_database_version();
     /// println!("database_version: {}", database_version);
     pub fn get_database_version(&self) -> String {
-        return self.header.year().to_string() + "." + &self.header.month().to_string() + "." + &self.header.day().to_string();
+        return self.header.year().to_string()
+            + "."
+            + &self.header.month().to_string()
+            + "."
+            + &self.header.day().to_string();
     }
 
     /// Get the set of supported columns.
@@ -479,14 +553,14 @@ impl Database {
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn get_available_columns(&self) -> Columns {
-        return self.header.columns
+        return self.header.columns;
     }
 }
 
-const FROM_6TO4: u128   = 0x2002_0000_0000_0000_0000_0000_0000_0000;
-const TO_6TO4: u128     = 0x2002_ffff_ffff_ffff_ffff_ffff_ffff_ffff;
+const FROM_6TO4: u128 = 0x2002_0000_0000_0000_0000_0000_0000_0000;
+const TO_6TO4: u128 = 0x2002_ffff_ffff_ffff_ffff_ffff_ffff_ffff;
 const FROM_TEREDO: u128 = 0x2001_0000_0000_0000_0000_0000_0000_0000;
-const TO_TEREDO: u128   = 0x2001_0000_ffff_ffff_ffff_ffff_ffff_ffff;
+const TO_TEREDO: u128 = 0x2001_0000_ffff_ffff_ffff_ffff_ffff_ffff;
 
 fn normalize_ip(addr: IpAddr) -> IpAddr {
     match addr {
@@ -501,7 +575,7 @@ fn normalize_ip(addr: IpAddr) -> IpAddr {
             } else {
                 IpAddr::V6(addr)
             }
-        },
+        }
     }
 }
 
@@ -532,9 +606,15 @@ pub struct Header {
 impl Header {
     fn read<R: Read>(mut reader: R) -> io::Result<Header> {
         let px = reader.read_u8()?;
-        let columns = PX.get(usize::from(px)).copied().unwrap_or_else(Columns::empty);
+        let columns = PX
+            .get(usize::from(px))
+            .copied()
+            .unwrap_or_else(Columns::empty);
         if columns.is_empty() {
-            return Err(io::Error::new(ErrorKind::InvalidData, "only px1 - px11 supported"));
+            return Err(io::Error::new(
+                ErrorKind::InvalidData,
+                "only px1 - px11 supported",
+            ));
         }
 
         Ok(Header {
@@ -612,7 +692,10 @@ const PX: [Columns; 12] = [
 
 fn validate_columns(num_columns: u8) -> io::Result<u8> {
     if num_columns < 1 || MAX_COLUMNS < usize::from(num_columns) {
-        Err(io::Error::new(ErrorKind::InvalidData, "invalid number of columns"))
+        Err(io::Error::new(
+            ErrorKind::InvalidData,
+            "invalid number of columns",
+        ))
     } else {
         Ok(num_columns)
     }
