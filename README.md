@@ -17,21 +17,18 @@ Usage example
 -------------
 
 ```rust
-use ip2proxy::{Columns, Database, Row};
+use ip2proxy::{Columns, Database};
 
-let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.SAMPLE.BIN").unwrap();
 
-let row = db.query("1.0.0.1".parse()?, Columns::all())?;
+let package_version = db.get_package_version();
+let database_version = db.get_database_version();
+println!("Database Version: {}", database_version);
+println!("Package Version: {}", package_version);
 
-assert_eq!(row, Some(Row {
-    proxy_type: Some(String::from("DCH")),
-    country_short: Some(String::from("AU")),
-    country_long: Some(String::from("Australia")),
-    region: Some(String::from("Queensland")),
-    city: Some(String::from("Brisbane")),
-    isp: Some(String::from("Research Prefix for APNIC Labs")),
-    ..Row::default()
-}));
+let row = db.query("1.0.0.1".parse().unwrap(), Columns::all()).unwrap();
+
+println!("{:#?}", row);
 ```
 
 Documentation

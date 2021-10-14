@@ -11,9 +11,9 @@
 //! ```rust
 //! use ip2proxy::{Columns, Database, Row};
 //!
-//! let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+//! let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN").unwrap();
 //!
-//! let row = db.query("1.0.0.1".parse()?, Columns::all())?;
+//! let row = db.query("1.0.0.1".parse().unwrap(), Columns::all()).unwrap();
 //!
 //! assert_eq!(row, Some(Row {
 //!     proxy_type: Some(String::from("DCH")),
@@ -31,7 +31,7 @@
 //!
 //! * `serde`: Implement `serde::Serialize` and `serde::Deserialize` for `Row`.
 
-#![doc(html_root_url = "https://docs.rs/ip2proxy/1.0.0")]
+#![doc(html_root_url = "https://docs.rs/ip2proxy/1.0.1")]
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -80,6 +80,10 @@ bitflags! {
         const AS_NAME       = 1 <<  9;
         /// See [`Row::last_seen`](struct.Row.html#structfield.last_seen).
         const LAST_SEEN     = 1 << 10;
+        /// See [`Row::threat`](struct.Row.html#structfield.threat).
+        const THREAT     = 1 << 11;
+        /// See [`Row::provider`](struct.Row.html#structfield.provider).
+        const PROVIDER     = 1 << 12;
 
         /// See [`Row::is_proxy()`](struct.Row.html#method.is_proxy).
         const IS_PROXY = Columns::PROXY_TYPE.bits | Columns::COUNTRY_SHORT.bits;
@@ -103,6 +107,15 @@ bitflags! {
         /// Alias for columns of PX8:
         /// IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN-LastSeen Database.
         const PX8 = Columns::PX7.bits | Columns::LAST_SEEN.bits;
+        /// Alias for columns of PX9:
+        /// IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN-LastSeen-Threat Database.
+        const PX9 = Columns::PX8.bits | Columns::THREAT.bits;
+        /// Alias for columns of PX10:
+        /// IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN-LastSeen-Threat-Residential Database.
+        const PX10 = Columns::PX9.bits;
+        /// Alias for columns of PX11:
+        /// IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN-LastSeen-Threat-Residential-Provider Database.
+        const PX11 = Columns::PX10.bits | Columns::PROVIDER.bits;
     }
 }
 
@@ -126,6 +139,7 @@ pub struct Row {
     /// | `PUB` | Public proxy |
     /// | `WEB` | Web based proxy |
     /// | `SES` | Search engine spider |
+    /// | `RES` | Residential proxies. Only available with PX10 & PX11 |
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub proxy_type: Option<String>,
 
@@ -185,6 +199,19 @@ pub struct Row {
     /// Number of days since the proxy was last seen.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub last_seen: Option<String>,
+    
+    /// Security threat reported.
+    /// | Threat type | Description |
+    /// | --- | --- |
+    /// | `SPAM` | Email and forum spammers |
+    /// | `SCANNER` | Network security scanners |
+    /// | `BOTNET` | Malware infected devices |
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub threat: Option<String>,
+    
+    /// Name of VPN provider if available.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub provider: Option<String>,
 }
 
 impl Row {
@@ -219,7 +246,7 @@ impl Database {
     /// ```
     /// use ip2proxy::Database;
     ///
-    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN").unwrap();
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     ///
@@ -267,7 +294,7 @@ impl Database {
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
     ///
-    /// let row = db.query("1.0.0.1".parse()?, Columns::all())?;
+    /// let row = db.query("1.0.0.1".parse().unwrap(), Columns::all()).unwrap();
     ///
     /// assert_eq!(row, Some(Row {
     ///     proxy_type: Some(String::from("DCH")),
@@ -360,6 +387,8 @@ impl Database {
             asn: self.read_col(&mut cursor, query, Columns::ASN)?,
             as_name: self.read_col(&mut cursor, query, Columns::AS_NAME)?,
             last_seen: self.read_col(&mut cursor, query, Columns::LAST_SEEN)?,
+            threat: self.read_col(&mut cursor, query, Columns::THREAT)?,
+            provider: self.read_col(&mut cursor, query, Columns::PROVIDER)?,
         })
     }
 
@@ -410,7 +439,7 @@ impl Database {
         }
     }
 
-    /// Get meta data from the database header.
+    /// Get package version.
     ///
     /// # Example
     ///
@@ -418,17 +447,24 @@ impl Database {
     /// use ip2proxy::Database;
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// let header = db.header();
-    /// assert_eq!(header.px(), 4);
-    /// assert_eq!(header.year(), 16); // 2016
-    /// assert_eq!(header.month(), 11); // November
-    /// assert_eq!(header.day(), 17); // 17th
-    /// assert_eq!(header.rows_ipv4(), 150);
-    /// assert_eq!(header.rows_ipv6(), 4);
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// let package_version = db.get_package_version();
+    /// println!("package_version: {}", package_version);
+    pub fn get_package_version(&self) -> u8 {
+        return self.header.px();
+    }
+
+    /// Get database version.
+    ///
+    /// # Example
+    ///
     /// ```
-    pub fn header(&self) -> &Header {
-        &self.header
+    /// use ip2proxy::Database;
+    ///
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// let database_version = db.database_version();
+    /// println!("database_version: {}", database_version);
+    pub fn get_database_version(&self) -> String {
+        return self.header.year().to_string() + "." + &self.header.month().to_string() + "." + &self.header.day().to_string();
     }
 }
 
@@ -483,7 +519,7 @@ impl Header {
         let px = reader.read_u8()?;
         let columns = PX.get(usize::from(px)).copied().unwrap_or_else(Columns::empty);
         if columns.is_empty() {
-            return Err(io::Error::new(ErrorKind::InvalidData, "only px1 - px8 supported"));
+            return Err(io::Error::new(ErrorKind::InvalidData, "only px1 - px11 supported"));
         }
 
         Ok(Header {
@@ -502,7 +538,7 @@ impl Header {
         })
     }
 
-    /// Get database format. Supported databases are PX1 to PX8.
+    /// Get database format. Supported databases are PX1 to PX11.
     pub fn px(&self) -> u8 {
         self.px
     }
@@ -553,9 +589,9 @@ impl Header {
 
 const HEADER_LEN: usize = 5 + 6 * 4;
 
-const MAX_COLUMNS: usize = 11;
+const MAX_COLUMNS: usize = 13;
 
-const PX: [Columns; 9] = [
+const PX: [Columns; 12] = [
     Columns::empty(),
     Columns::PX1,
     Columns::PX2,
@@ -565,6 +601,9 @@ const PX: [Columns; 9] = [
     Columns::PX6,
     Columns::PX7,
     Columns::PX8,
+    Columns::PX9,
+    Columns::PX10,
+    Columns::PX11,
 ];
 
 fn validate_columns(num_columns: u8) -> io::Result<u8> {
