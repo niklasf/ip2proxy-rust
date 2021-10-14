@@ -528,8 +528,7 @@ impl Database {
     /// use ip2proxy::Database;
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// let package_version = db.package_version();
-    /// println!("package_version: {}", package_version);
+    /// assert_eq!(db.package_version(), 4);
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn package_version(&self) -> u8 {
