@@ -296,7 +296,7 @@ impl Database {
     /// ```
     /// use ip2proxy::Database;
     ///
-    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN").unwrap();
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     ///
@@ -350,7 +350,7 @@ impl Database {
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
     ///
-    /// let row = db.query("1.0.0.1".parse().unwrap(), Columns::all()).unwrap();
+    /// let row = db.query("1.0.0.1".parse()?, Columns::all())?;
     ///
     /// assert_eq!(row, Some(Row {
     ///     proxy_type: Some(String::from("DCH")),
@@ -526,9 +526,11 @@ impl Database {
     /// ```
     /// use ip2proxy::Database;
     ///
-    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN").unwrap();
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
     /// let package_version = db.get_package_version();
     /// println!("package_version: {}", package_version);
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
     pub fn get_package_version(&self) -> u8 {
         return self.header.px();
     }
@@ -540,9 +542,11 @@ impl Database {
     /// ```
     /// use ip2proxy::Database;
     ///
-    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN").unwrap();
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
     /// let database_version = db.get_database_version();
     /// println!("database_version: {}", database_version);
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
     pub fn get_database_version(&self) -> String {
         return self.header.year().to_string()
             + "."
