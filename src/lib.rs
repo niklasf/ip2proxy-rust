@@ -13,8 +13,8 @@
 //!
 //! let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN")?;
 //!
-//! assert_eq!(db.get_package_version(), 11);
-//! assert_eq!(db.get_database_version(), "21.5.28");
+//! assert_eq!(db.package_version(), 11);
+//! assert_eq!(db.database_version(), "21.5.28");
 //!
 //! let row = db.query("1.0.0.1".parse()?, Columns::all())?;
 //!
@@ -527,11 +527,11 @@ impl Database {
     /// use ip2proxy::Database;
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// let package_version = db.get_package_version();
+    /// let package_version = db.package_version();
     /// println!("package_version: {}", package_version);
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn get_package_version(&self) -> u8 {
+    pub fn package_version(&self) -> u8 {
         return self.header.px;
     }
 
@@ -543,11 +543,11 @@ impl Database {
     /// use ip2proxy::Database;
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// let database_version = db.get_database_version();
+    /// let database_version = db.database_version();
     /// println!("database_version: {}", database_version);
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn get_database_version(&self) -> String {
+    pub fn database_version(&self) -> String {
         return self.year().to_string()
             + "."
             + &self.month().to_string()
@@ -563,10 +563,10 @@ impl Database {
     /// use ip2proxy::{Columns, Database};
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// assert!(db.get_available_columns().contains(Columns::PROXY_TYPE));
+    /// assert!(db.columns().contains(Columns::PROXY_TYPE));
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn get_available_columns(&self) -> Columns {
+    pub fn columns(&self) -> Columns {
         return self.header.columns;
     }
 
