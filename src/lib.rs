@@ -11,25 +11,18 @@
 //! ```
 //! use ip2proxy::{Columns, Database, Row};
 //!
-//! let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN")?;
+//! let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
 //!
-//! assert_eq!(db.package_version(), 11);
-//! println!("database version: {}", db.database_version()); // 21.5.28
+//! assert_eq!(db.package_version(), 4);
+//! assert_eq!(db.database_version(), "16.11.17");
 //!
 //! if let Some(row) = db.query("1.0.0.1".parse()?, Columns::all())? {
 //!     assert_eq!(row.proxy_type, Some(String::from("DCH")));
-//!     assert_eq!(row.country_short, Some(String::from("US")));
-//!     assert_eq!(row.country_long, Some(String::from("United States of America")));
-//!     assert_eq!(row.region, Some(String::from("California")));
-//!     assert_eq!(row.city, Some(String::from("Los Angeles")));
-//!     assert_eq!(row.isp, Some(String::from("APNIC and CloudFlare DNS Resolver Project")));
-//!     assert_eq!(row.domain, Some(String::from("cloudflare.com")));
-//!     assert_eq!(row.usage_type, Some(String::from("CDN")));
-//!     assert_eq!(row.asn, Some(String::from("13335")));
-//!     assert_eq!(row.as_name, Some(String::from("CloudFlare Inc")));
-//!     assert_eq!(row.last_seen, Some(String::from("27")));
-//!     assert_eq!(row.threat, Some(String::from("-")));
-//!     assert_eq!(row.provider, Some(String::from("-")));
+//!     assert_eq!(row.country_short, Some(String::from("AU")));
+//!     assert_eq!(row.country_long, Some(String::from("Australia")));
+//!     assert_eq!(row.region, Some(String::from("Queensland")));
+//!     assert_eq!(row.city, Some(String::from("Brisbane")));
+//!     assert_eq!(row.isp, Some(String::from("Research Prefix for APNIC Labs")));
 //! }
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
@@ -535,7 +528,7 @@ impl Database {
     /// use ip2proxy::Database;
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// println!("database version: {}", db.database_version()); // 21.5.28
+    /// assert_eq!(db.database_version(), "16.11.17");
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn database_version(&self) -> String {
