@@ -69,34 +69,34 @@ bitflags! {
     /// assert_eq!(Columns::PX2, Columns::PROXY_TYPE | Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG);
     /// ```
     pub struct Columns: u32 {
-        /// See [`Row::proxy_type`](struct.Row.html#structfield.proxy_type).
+        /// See [`Row::proxy_type`].
         const PROXY_TYPE    = 1;
-        /// See [`Row::country_short`](struct.Row.html#structfield.country_short).
+        /// See [`Row::country_short`].
         const COUNTRY_SHORT = 1 <<  1;
-        /// See [`Row::country_long`](struct.Row.html#structfield.country_long).
+        /// See [`Row::country_long`].
         const COUNTRY_LONG  = 1 <<  2;
-        /// See [`Row::region`](struct.Row.html#structfield.region).
+        /// See [`Row::region`].
         const REGION        = 1 <<  3;
-        /// See [`Row::city`](struct.Row.html#structfield.city).
+        /// See [`Row::city`].
         const CITY          = 1 <<  4;
-        /// See [`Row::isp`](struct.Row.html#structfield.isp).
+        /// See [`Row::isp`].
         const ISP           = 1 <<  5;
-        /// See [`Row::domain`](struct.Row.html#structfield.domain).
+        /// See [`Row::domain`].
         const DOMAIN        = 1 <<  6;
-        /// See [`Row::usage_type`](struct.Row.html#structfield.usage_type).
+        /// See [`Row::usage_type`].
         const USAGE_TYPE    = 1 <<  7;
-        /// See [`Row::asn`](struct.Row.html#structfield.asn).
+        /// See [`Row::asn`].
         const ASN           = 1 <<  8;
-        /// See [`Row::as_name`](struct.Row.html#structfield.as_name).
+        /// See [`Row::as_name`].
         const AS_NAME       = 1 <<  9;
-        /// See [`Row::last_seen`](struct.Row.html#structfield.last_seen).
+        /// See [`Row::last_seen`].
         const LAST_SEEN     = 1 << 10;
-        /// See [`Row::threat`](struct.Row.html#structfield.threat).
-        const THREAT     = 1 << 11;
-        /// See [`Row::provider`](struct.Row.html#structfield.provider).
-        const PROVIDER     = 1 << 12;
+        /// See [`Row::threat`].
+        const THREAT        = 1 << 11;
+        /// See [`Row::provider`].
+        const PROVIDER      = 1 << 12;
 
-        /// See [`Row::is_proxy()`](struct.Row.html#method.is_proxy).
+        /// See [`Row::is_proxy()`].
         const IS_PROXY = Columns::PROXY_TYPE.bits | Columns::COUNTRY_SHORT.bits;
 
         /// Alias for columns of PX1: IP-Country Database.
@@ -245,6 +245,7 @@ pub struct Row {
     pub last_seen: Option<String>,
 
     /// Security threat reported.
+    ///
     /// | Threat type | Description |
     /// | --- | --- |
     /// | `SPAM` | Email and forum spammers |
