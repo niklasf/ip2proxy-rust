@@ -532,7 +532,7 @@ impl Database {
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn package_version(&self) -> u8 {
-        return self.header.px;
+        self.header.px
     }
 
     /// Get database version.
@@ -548,11 +548,7 @@ impl Database {
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn database_version(&self) -> String {
-        return self.year().to_string()
-            + "."
-            + &self.month().to_string()
-            + "."
-            + &self.day().to_string();
+        format!("{}.{}.{}", self.year(), self.month(), self.day())
     }
 
     /// Get the set of supported columns.
@@ -567,7 +563,7 @@ impl Database {
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn columns(&self) -> Columns {
-        return self.header.columns;
+        self.header.columns
     }
 
     /// Get the database creation year. Convention is `16` for `2016`.
