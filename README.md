@@ -22,7 +22,7 @@ use ip2proxy::{Columns, Database, Row};
 let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN")?;
 
 assert_eq!(db.package_version(), 11);
-assert_eq!(db.database_version(), "21.5.28");
+println!("database version: {}", db.database_version()); // 21.5.28
 
 let row = db.query("1.0.0.1".parse()?, Columns::all())?;
 

@@ -14,7 +14,7 @@
 //! let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN")?;
 //!
 //! assert_eq!(db.package_version(), 11);
-//! assert_eq!(db.database_version(), "21.5.28");
+//! println!("database version: {}", db.database_version()); // 21.5.28
 //!
 //! let row = db.query("1.0.0.1".parse()?, Columns::all())?;
 //!
@@ -536,7 +536,7 @@ impl Database {
         self.header.px
     }
 
-    /// Get database version.
+    /// Get database version as `YY.M.D`.
     ///
     /// # Example
     ///
@@ -544,8 +544,7 @@ impl Database {
     /// use ip2proxy::Database;
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// let database_version = db.database_version();
-    /// println!("database_version: {}", database_version);
+    /// println!("database version: {}", db.database_version()); // 21.5.28
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn database_version(&self) -> String {
