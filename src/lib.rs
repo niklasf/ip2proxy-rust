@@ -446,7 +446,7 @@ impl Database {
     /// ```
     /// use ip2proxy::Database;
     ///
-    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN").unwrap();
     /// let package_version = db.get_package_version();
     /// println!("package_version: {}", package_version);
     pub fn get_package_version(&self) -> u8 {
@@ -460,11 +460,26 @@ impl Database {
     /// ```
     /// use ip2proxy::Database;
     ///
-    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN").unwrap();
     /// let database_version = db.database_version();
     /// println!("database_version: {}", database_version);
     pub fn get_database_version(&self) -> String {
         return self.header.year().to_string() + "." + &self.header.month().to_string() + "." + &self.header.day().to_string();
+    }
+
+    /// Get the set of supported columns.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ip2proxy::{Columns, Database};
+    ///
+    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
+    /// assert!(db.get_available_columns().contains(Columns::PROXY_TYPE));
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn get_available_columns(&self) -> Columns {
+        return self.header.columns
     }
 }
 
@@ -571,17 +586,6 @@ impl Header {
         self.rows_ipv6
     }
 
-    /// Get the set of supported columns.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use ip2proxy::{Columns, Database};
-    ///
-    /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN")?;
-    /// assert!(db.header().columns().contains(Columns::PROXY_TYPE));
-    /// # Ok::<_, Box<dyn std::error::Error>>(())
-    /// ```
     pub fn columns(&self) -> Columns {
         self.columns
     }
