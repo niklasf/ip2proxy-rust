@@ -532,7 +532,7 @@ impl Database {
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn get_package_version(&self) -> u8 {
-        return self.header.px();
+        return self.header.px;
     }
 
     /// Get database version.
@@ -548,11 +548,11 @@ impl Database {
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn get_database_version(&self) -> String {
-        return self.header.year().to_string()
+        return self.year().to_string()
             + "."
-            + &self.header.month().to_string()
+            + &self.month().to_string()
             + "."
-            + &self.header.day().to_string();
+            + &self.day().to_string();
     }
 
     /// Get the set of supported columns.
@@ -568,6 +568,34 @@ impl Database {
     /// ```
     pub fn get_available_columns(&self) -> Columns {
         return self.header.columns;
+    }
+
+    /// Get the database creation year. Convention is `16` for `2016`.
+    pub fn year(&self) -> u8 {
+        self.header.year
+    }
+
+    /// Get the database creation month. Convention is `1` for January.
+    pub fn month(&self) -> u8 {
+        self.header.month
+    }
+
+    /// Get the database creation day. Convention is `1` for the first day
+    /// of the month.
+    pub fn day(&self) -> u8 {
+        self.header.day
+    }
+
+    /// Get the number of rows for IPv4 addresses. Rows can cover a range,
+    /// so there may be information for many more IP addresses.
+    pub fn rows_ipv4(&self) -> u32 {
+        self.header.rows_ipv4
+    }
+
+    /// Get the number of rows for IPv6 addresses. Rows can cover a range,
+    /// so there may be information for many more IP addresses.
+    pub fn rows_ipv6(&self) -> u32 {
+        self.header.rows_ipv6
     }
 }
 
@@ -597,12 +625,8 @@ fn mid(low_row: u32, high_row: u32) -> u32 {
     ((u64::from(low_row) + u64::from(high_row)) / 2) as u32
 }
 
-/// A database header with meta information.
-///
-/// See [`Database::header()`](struct.Database.html#method.header) for a usage
-/// example.
-#[derive(Debug, Clone)]
-pub struct Header {
+#[derive(Debug)]
+struct Header {
     px: u8,
     num_columns: u8,
     year: u8,
@@ -645,43 +669,6 @@ impl Header {
             index_ptr_ipv4: reader.read_u32::<LE>()?,
             index_ptr_ipv6: reader.read_u32::<LE>()?,
         })
-    }
-
-    /// Get database format. Supported databases are PX1 to PX11.
-    pub fn px(&self) -> u8 {
-        self.px
-    }
-
-    /// Get the database creation year. Convention is `16` for `2016`.
-    pub fn year(&self) -> u8 {
-        self.year
-    }
-
-    /// Get the database creation month. Convention is `1` for January.
-    pub fn month(&self) -> u8 {
-        self.month
-    }
-
-    /// Get the database creation day. Convention is `1` for the first day
-    /// of the month.
-    pub fn day(&self) -> u8 {
-        self.day
-    }
-
-    /// Get the number of rows for IPv4 addresses. Rows can cover a range,
-    /// so there may be information for many more IP addresses.
-    pub fn rows_ipv4(&self) -> u32 {
-        self.rows_ipv4
-    }
-
-    /// Get the number of rows for IPv6 addresses. Rows can cover a range,
-    /// so there may be information for many more IP addresses.
-    pub fn rows_ipv6(&self) -> u32 {
-        self.rows_ipv6
-    }
-
-    pub fn columns(&self) -> Columns {
-        self.columns
     }
 }
 
