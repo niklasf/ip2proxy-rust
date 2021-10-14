@@ -8,20 +8,30 @@
 //!
 //! # Example
 //!
-//! ```rust
+//! ```
 //! use ip2proxy::{Columns, Database, Row};
 //!
-//! let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN").unwrap();
+//! let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP-DOMAIN-USAGETYPE-ASN-LASTSEEN-THREAT-RESIDENTIAL-PROVIDER.BIN")?;
 //!
-//! let row = db.query("1.0.0.1".parse().unwrap(), Columns::all()).unwrap();
+//! assert_eq!(db.get_package_version(), 11);
+//! assert_eq!(db.get_database_version(), "21.5.28");
+//!
+//! let row = db.query("1.0.0.1".parse()?, Columns::all())?;
 //!
 //! assert_eq!(row, Some(Row {
 //!     proxy_type: Some(String::from("DCH")),
-//!     country_short: Some(String::from("AU")),
-//!     country_long: Some(String::from("Australia")),
-//!     region: Some(String::from("Queensland")),
-//!     city: Some(String::from("Brisbane")),
-//!     isp: Some(String::from("Research Prefix for APNIC Labs")),
+//!     country_short: Some(String::from("US")),
+//!     country_long: Some(String::from("United States of America")),
+//!     region: Some(String::from("California")),
+//!     city: Some(String::from("Los Angeles")),
+//!     isp: Some(String::from("APNIC and CloudFlare DNS Resolver Project")),
+//!     domain: Some(String::from("cloudflare.com")),
+//!     usage_type: Some(String::from("CDN")),
+//!     asn: Some(String::from("13335")),
+//!     as_name: Some(String::from("CloudFlare Inc")),
+//!     last_seen: Some(String::from("27")),
+//!     threat: Some(String::from("-")),
+//!     provider: Some(String::from("-")),
 //!     ..Row::default()
 //! }));
 //! # Ok::<_, Box<dyn std::error::Error>>(())
