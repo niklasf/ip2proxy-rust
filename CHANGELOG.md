@@ -1,12 +1,13 @@
 Changelog for ip2proxy
 ======================
 
-v1.0.1
+v2.0.0
 ------
 
-* Added support for PX9-PX11 BIN database.
-* Added get_package_version and get_database_version funtions to replace the header function.
-* Modify the example in README.md.
+* Added support for PX9-PX11 BIN databases.
+* Future proofed `Row` for addition of new fields.
+* Added `Database::database_version()`.
+* Replaced `Database::header()` with methods directly on `Database`.
 
 v1.0.0
 ------
