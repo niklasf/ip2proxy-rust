@@ -127,6 +127,7 @@ bitflags! {
 ///
 /// By convention, `-` is used for fields where the column is supported but
 /// the cell does not have a value.
+#[non_exhaustive]
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Row {
@@ -253,9 +254,6 @@ pub struct Row {
         serde(default, skip_serializing_if = "Option::is_none")
     )]
     pub provider: Option<String>,
-
-    // Future proofing for additional fields.
-    _priv: (),
 }
 
 impl Row {
@@ -434,7 +432,6 @@ impl Database {
             last_seen: self.read_col(&mut cursor, query, Columns::LAST_SEEN)?,
             threat: self.read_col(&mut cursor, query, Columns::THREAT)?,
             provider: self.read_col(&mut cursor, query, Columns::PROVIDER)?,
-            _priv: (),
         })
     }
 
