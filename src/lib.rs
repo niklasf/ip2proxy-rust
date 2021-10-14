@@ -461,7 +461,7 @@ impl Database {
     /// use ip2proxy::Database;
     ///
     /// let db = Database::open("data/IP2PROXY-IP-PROXYTYPE-COUNTRY-REGION-CITY-ISP.SAMPLE.BIN").unwrap();
-    /// let database_version = db.database_version();
+    /// let database_version = db.get_database_version();
     /// println!("database_version: {}", database_version);
     pub fn get_database_version(&self) -> String {
         return self.header.year().to_string() + "." + &self.header.month().to_string() + "." + &self.header.day().to_string();
