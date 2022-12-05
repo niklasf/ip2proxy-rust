@@ -382,7 +382,7 @@ impl Database {
                 let mid_row = mid(low_row, high_row);
 
                 let row_ptr = u64::from(base_ptr) + u64::from(mid_row) * row_size as u64 - 1; // base_ptr > 0, row_size small
-                let buf = &mut buffer[..(row_size + addr_size) as usize];
+                let buf = &mut buffer[..(row_size + addr_size)];
                 self.raf.read_exact_at(row_ptr, buf)?; // row
 
                 let below = match addr {
