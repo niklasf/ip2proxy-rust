@@ -11,7 +11,7 @@ categories = ["web-programming", "parser-implementations"]
 edition = "2018"
 
 [dependencies]
-positioned-io = { package = "positioned-io-preview", version = "0.3" }
+positioned-io = "0.3"
 byteorder = "1"
 bitflags = "1"
 serde = { version = "1", features = ["derive"], optional = true }
