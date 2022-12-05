@@ -8,7 +8,7 @@ authors = ["Niklas Fiekas <niklas.fiekas@backscattering.de>"]
 license = "MIT OR Apache-2.0"
 keywords = ["ip", "proxy", "geolocation"]
 categories = ["web-programming", "parser-implementations"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 positioned-io = "0.3"
