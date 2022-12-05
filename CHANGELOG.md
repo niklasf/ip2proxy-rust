@@ -1,6 +1,12 @@
 Changelog for ip2proxy
 ======================
 
+v2.0.1
+------
+
+* Bump edition to 2021.
+* Switch from `positioned-io-preview` to `positioned-io`.
+
 v2.0.0
 ------
 

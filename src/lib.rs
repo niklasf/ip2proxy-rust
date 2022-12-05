@@ -31,7 +31,7 @@
 //!
 //! * `serde`: Implement `serde::Serialize` and `serde::Deserialize` for `Row`.
 
-#![doc(html_root_url = "https://docs.rs/ip2proxy/2.0.0")]
+#![doc(html_root_url = "https://docs.rs/ip2proxy/2.0.1")]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
