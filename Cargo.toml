@@ -13,7 +13,7 @@ edition = "2021"
 [dependencies]
 positioned-io = "0.3"
 byteorder = "1"
-bitflags = "1"
+bitflags = "2"
 serde = { version = "1", features = ["derive"], optional = true }
 
 [package.metadata.docs.rs]
