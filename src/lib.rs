@@ -44,7 +44,7 @@ use std::{
 };
 
 use bitflags::bitflags;
-use byteorder::{ByteOrder as _, ReadBytesExt as _, LE};
+use byteorder::{ByteOrder as _, LE, ReadBytesExt as _};
 use positioned_io::{Cursor, RandomAccessFile, ReadAt, ReadBytesAtExt as _};
 
 bitflags! {
@@ -57,9 +57,10 @@ bitflags! {
     ///
     /// assert_eq!(Columns::PX2, Columns::PROXY_TYPE | Columns::COUNTRY_SHORT | Columns::COUNTRY_LONG);
     /// ```
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct Columns: u32 {
         /// See [`Row::proxy_type`].
-        const PROXY_TYPE    = 1;
+        const PROXY_TYPE    = 1 <<  0;
         /// See [`Row::country_short`].
         const COUNTRY_SHORT = 1 <<  1;
         /// See [`Row::country_long`].
@@ -86,36 +87,36 @@ bitflags! {
         const PROVIDER      = 1 << 12;
 
         /// See [`Row::is_proxy()`].
-        const IS_PROXY = Columns::PROXY_TYPE.bits | Columns::COUNTRY_SHORT.bits;
+        const IS_PROXY = Columns::PROXY_TYPE.bits() | Columns::COUNTRY_SHORT.bits();
 
         /// Alias for columns of PX1: IP-Country Database.
-        const PX1 = Columns::COUNTRY_SHORT.bits | Columns::COUNTRY_LONG.bits;
+        const PX1 = Columns::COUNTRY_SHORT.bits() | Columns::COUNTRY_LONG.bits();
         /// Alias for columns of PX2: IP-ProxyType-Country Database.
-        const PX2 = Columns::PROXY_TYPE.bits | Columns::PX1.bits;
+        const PX2 = Columns::PROXY_TYPE.bits() | Columns::PX1.bits();
         /// Alias for columns of PX3: IP-ProxyType-Country-Region-City Database.
-        const PX3 = Columns::PX2.bits | Columns::REGION.bits | Columns::CITY.bits;
+        const PX3 = Columns::PX2.bits() | Columns::REGION.bits() | Columns::CITY.bits();
         /// Alias for columns of PX4: IP-ProxyType-Country-Region-City-ISP Database.
-        const PX4 = Columns::PX3.bits | Columns::ISP.bits;
+        const PX4 = Columns::PX3.bits() | Columns::ISP.bits();
         /// Alias for columns of PX5: IP-ProxyType-Country-Region-City-ISP-Domain Database.
-        const PX5 = Columns::PX4.bits | Columns::DOMAIN.bits;
+        const PX5 = Columns::PX4.bits() | Columns::DOMAIN.bits();
         /// Alias for columns of PX6: IP-ProxyType-Country-Region-City-ISP-Domain-UsageType
         /// Database.
-        const PX6 = Columns::PX5.bits | Columns::USAGE_TYPE.bits;
+        const PX6 = Columns::PX5.bits() | Columns::USAGE_TYPE.bits();
         /// Alias for columns of PX7: IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN
         /// Database.
-        const PX7 = Columns::PX6.bits | Columns::ASN.bits | Columns::AS_NAME.bits;
+        const PX7 = Columns::PX6.bits() | Columns::ASN.bits() | Columns::AS_NAME.bits();
         /// Alias for columns of PX8:
         /// IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN-LastSeen Database.
-        const PX8 = Columns::PX7.bits | Columns::LAST_SEEN.bits;
+        const PX8 = Columns::PX7.bits() | Columns::LAST_SEEN.bits();
         /// Alias for columns of PX9:
         /// IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN-LastSeen-Threat Database.
-        const PX9 = Columns::PX8.bits | Columns::THREAT.bits;
+        const PX9 = Columns::PX8.bits() | Columns::THREAT.bits();
         /// Alias for columns of PX10:
         /// IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN-LastSeen-Threat-Residential Database.
-        const PX10 = Columns::PX9.bits;
+        const PX10 = Columns::PX9.bits();
         /// Alias for columns of PX11:
         /// IP-ProxyType-Country-Region-City-ISP-Domain-UsageType-ASN-LastSeen-Threat-Residential-Provider Database.
-        const PX11 = Columns::PX10.bits | Columns::PROVIDER.bits;
+        const PX11 = Columns::PX10.bits() | Columns::PROVIDER.bits();
     }
 }
 
@@ -584,7 +585,7 @@ fn normalize_ip(addr: IpAddr) -> IpAddr {
     match addr {
         IpAddr::V4(_) => addr,
         IpAddr::V6(addr) => {
-            if let Some(addr) = addr.to_ipv4() {
+            if let Some(addr) = addr.to_ipv4_mapped() {
                 IpAddr::V4(addr)
             } else if Ipv6Addr::from(FROM_6TO4) <= addr && addr <= Ipv6Addr::from(TO_6TO4) {
                 IpAddr::V4(((u128::from(addr) >> 80) as u32).into())
