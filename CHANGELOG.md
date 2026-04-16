@@ -1,6 +1,12 @@
 Changelog for ip2proxy
 ======================
 
+v3.0.0
+------
+
+* Bump edition to 2024.
+* Update to `bitflags` 2, causing minor changes to `Column`.
+
 v2.0.1
 ------
 
